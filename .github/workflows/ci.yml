@@ -4,6 +4,11 @@ name: CI
 # no high-severity npm audit findings. Build/deploy is intentionally NOT part of this pipeline —
 # Phase 1's task list scopes CI to "lint + type check" (see 02-Phases/Phase-1-Foundation.md);
 # deploy.yml is a separate, later concern.
+#
+# Note: car-guide-app IS the repo root (package.json, app/, etc. live at top level) — there is
+# no nested car-guide-app/ subfolder. An earlier version of this file assumed otherwise and set
+# working-directory/cache-dependency-path to "car-guide-app", which doesn't exist in the checked-
+# out repo and broke actions/setup-node's dependency cache resolution. Fixed 2026-06-28.
 on:
   pull_request:
     branches: [develop, main]
@@ -13,9 +18,6 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: car-guide-app
     steps:
       - uses: actions/checkout@v4
 
@@ -23,7 +25,7 @@ jobs:
         with:
           node-version: "20"
           cache: "npm"
-          cache-dependency-path: car-guide-app/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
