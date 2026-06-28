@@ -1,0 +1,52 @@
+name: CI
+
+# Runs on every PR per vault Git-Workflow.md PR requirements: lint, type check, unit tests,
+# no high-severity npm audit findings. Build/deploy is intentionally NOT part of this pipeline —
+# Phase 1's task list scopes CI to "lint + type check" (see 02-Phases/Phase-1-Foundation.md);
+# deploy.yml is a separate, later concern.
+#
+# Note: car-guide-app IS the repo root (package.json, app/, etc. live at top level) — there is
+# no nested car-guide-app/ subfolder. An earlier version of this file assumed otherwise and set
+# working-directory/cache-dependency-path to "car-guide-app", which doesn't exist in the checked-
+# out repo and broke actions/setup-node's dependency cache resolution. Fixed 2026-06-28.
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Unit tests
+        run: npm test
+
+      - name: npm audit (high severity)
+        # Currently non-blocking: 4 pre-existing high-severity findings in next@14.2.35 are only
+        # fixable via a breaking major upgrade, tracked separately rather than bundled into
+        # feature PRs. See vault decision 0005-build-sandbox-crashes-and-audit-gate.md.
+        # Remove `continue-on-error` once that upgrade lands and re-enable as a hard gate per
+        # Git-Workflow.md.
+        run: npm audit --audit-level=high
+        continue-on-error: true
