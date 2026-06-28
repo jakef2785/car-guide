@@ -1,0 +1,12 @@
+// Prisma schema — TODO Phase 1: model makes, models, variants, recalls, complaints, tsbs,
+// profiles, reviews per vault 01-Specification/Database-Schema.md, with RLS-aware design.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
