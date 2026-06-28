@@ -1,3 +1,32 @@
-// Server-side Supabase client (anon key, cookie-based session).
-// TODO Phase 1: implement with @supabase/ssr createServerClient.
-export {};
+// Server-side Supabase client (anon/publishable key, cookie-based session).
+// Use in Server Components, Route Handlers, and Server Actions. Auth state comes from the
+// httpOnly session cookie — never from localStorage (see Security-Requirements.md).
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
+
+export async function createClient() {
+  const cookieStore = await cookies();
+
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options),
+            );
+          } catch {
+            // setAll called from a Server Component (no response to write cookies to).
+            // Safe to ignore as long as middleware refreshes the session — add that in
+            // Phase 4 when auth is implemented.
+          }
+        },
+      },
+    },
+  );
+}
