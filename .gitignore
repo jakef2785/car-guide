@@ -31,6 +31,10 @@ yarn-error.log*
 # vercel
 .vercel
 
+# raw external datasets — large, regenerable via scripts/match-epa-fuel-economy.ts.
+# Re-download from https://www.fueleconomy.gov/feg/epadata/vehicles.csv if missing.
+/data/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

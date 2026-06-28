@@ -1,5 +1,7 @@
-// Prisma schema — TODO Phase 1: model makes, models, variants, recalls, complaints, tsbs,
-// profiles, reviews per vault 01-Specification/Database-Schema.md, with RLS-aware design.
+// Prisma schema for CarGuide.
+// Source of truth: vault 01-Specification/Database-Schema.md
+// RLS policies are NOT defined here — Prisma doesn't manage RLS. They're applied via raw SQL
+// migrations / the Supabase SQL editor. See 03-Decisions and Phase-1-Foundation in the vault.
 
 generator client {
   provider = "prisma-client-js"
@@ -10,3 +12,175 @@ datasource db {
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
 }
+
+// ---------------------------------------------------------------------------
+// Core sourced-data tables — public read, service-role-only write (RLS).
+// ---------------------------------------------------------------------------
+
+model Make {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String   @unique
+  slug      String   @unique
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  models Model[]
+
+  @@map("makes")
+}
+
+model Model {
+  id        String   @id @default(uuid()) @db.Uuid
+  makeId    String?  @map("make_id") @db.Uuid
+  name      String
+  slug      String   @unique
+  bodyType  String?  @map("body_type")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  make       Make?       @relation(fields: [makeId], references: [id], onDelete: Cascade)
+  variants   Variant[]
+  recalls    Recall[]
+  complaints Complaint[]
+  tsbs       Tsb[]
+  reviews    Review[]
+
+  @@map("models")
+}
+
+model Variant {
+  id            String   @id @default(uuid()) @db.Uuid
+  modelId       String?  @map("model_id") @db.Uuid
+  year          Int
+  trimName      String?  @map("trim_name")
+  engineSizeCc  Int?     @map("engine_size_cc")
+  fuelType      String?  @map("fuel_type")
+  transmission  String?
+  horsepower    Int?
+  torqueNm      Int?     @map("torque_nm")
+  zeroToSixty   Decimal? @map("zero_to_sixty") @db.Decimal(4, 2)
+  topSpeedMph   Int?     @map("top_speed_mph")
+  doors         Int?
+  seats         Int?
+  kerbWeightKg  Int?     @map("kerb_weight_kg")
+
+  // Fuel economy (UK MPG from VCA/EPA, converted where needed)
+  mpgUrban      Decimal? @map("mpg_urban") @db.Decimal(5, 1)
+  mpgExtraUrban Decimal? @map("mpg_extra_urban") @db.Decimal(5, 1)
+  mpgCombined   Decimal? @map("mpg_combined") @db.Decimal(5, 1)
+  co2Gkm        Int?     @map("co2_gkm")
+
+  // Road tax computed from co2Gkm using GOV.UK bands
+  vedAnnualGbp  Int?     @map("ved_annual_gbp")
+
+  // Metadata — source transparency, mandatory per Guiding Principles
+  dataSource    String   @map("data_source")
+  dataFetchedAt DateTime @map("data_fetched_at") @db.Timestamptz()
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  model Model? @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@map("variants")
+}
+
+model Recall {
+  id              String    @id @default(uuid()) @db.Uuid
+  modelId         String?   @map("model_id") @db.Uuid
+  nhtsaCampaignId String?   @map("nhtsa_campaign_id")
+  yearFrom        Int?      @map("year_from")
+  yearTo          Int?      @map("year_to")
+  component       String?
+  summary         String?
+  consequence     String?
+  remedy          String?
+  recallDate      DateTime? @map("recall_date") @db.Date
+  dataSource      String    @map("data_source")
+  dataFetchedAt   DateTime  @map("data_fetched_at") @db.Timestamptz()
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  model Model? @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@map("recalls")
+}
+
+model Complaint {
+  id              String    @id @default(uuid()) @db.Uuid
+  modelId         String?   @map("model_id") @db.Uuid
+  variantYear     Int?      @map("variant_year")
+  component       String?
+  summary         String?
+  complaintDate   DateTime? @map("complaint_date") @db.Date
+  crashInvolved   Boolean?  @map("crash_involved")
+  injuryInvolved  Boolean?  @map("injury_involved")
+  dataSource      String    @map("data_source")
+  dataFetchedAt   DateTime  @map("data_fetched_at") @db.Timestamptz()
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz()
+
+  model Model? @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@map("complaints")
+}
+
+model Tsb {
+  id            String   @id @default(uuid()) @db.Uuid
+  modelId       String?  @map("model_id") @db.Uuid
+  yearFrom      Int?     @map("year_from")
+  yearTo        Int?     @map("year_to")
+  component     String?
+  summary       String?
+  tsbNumber     String?  @map("tsb_number")
+  dataSource    String   @map("data_source")
+  dataFetchedAt DateTime @map("data_fetched_at") @db.Timestamptz()
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  model Model? @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@map("tsbs")
+}
+
+// ---------------------------------------------------------------------------
+// User and review tables.
+// ---------------------------------------------------------------------------
+
+// Extends Supabase auth.users. Prisma can't manage auth.users itself (owned by Supabase Auth),
+// so this model only maps the public.profiles table; the FK to auth.users(id) is enforced via
+// raw SQL in the migration, not by Prisma relations.
+model Profile {
+  id        String   @id @db.Uuid
+  username  String?  @unique
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  reviews Review[]
+
+  @@map("profiles")
+}
+
+model Review {
+  id                  String   @id @default(uuid()) @db.Uuid
+  userId              String?  @map("user_id") @db.Uuid
+  modelId             String?  @map("model_id") @db.Uuid
+  variantYear         Int?     @map("variant_year")
+  ownershipMonths     Int?     @map("ownership_months")
+  annualMileage       Int?     @map("annual_mileage")
+
+  reliabilityRating   Int?     @map("reliability_rating")
+  runningCostRating   Int?     @map("running_cost_rating")
+
+  realWorldMpg        Decimal? @map("real_world_mpg") @db.Decimal(5, 1)
+  monthlyFuelCostGbp  Decimal? @map("monthly_fuel_cost_gbp") @db.Decimal(7, 2)
+  monthlyInsuranceGbp Decimal? @map("monthly_insurance_gbp") @db.Decimal(7, 2)
+  annualServicingGbp  Decimal? @map("annual_servicing_gbp") @db.Decimal(7, 2)
+
+  title       String?
+  body        String?
+  knownIssues String?  @map("known_issues")
+
+  isApproved  Boolean  @default(false) @map("is_approved")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  user  Profile? @relation(fields: [userId], references: [id], onDelete: Cascade)
+  model Model?   @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@map("reviews")
+}
+
+// Scoring weights (performance/economy/running-cost/recall/complaint, 0-100) are intentionally
+// NOT a table — handled client-side per search session. See 01-Specification/Scoring-System.md.
