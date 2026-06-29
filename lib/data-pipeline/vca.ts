@@ -56,9 +56,16 @@ function title(s: string): string {
     .trim();
 }
 
-// Strip the trailing model-year marker ("500e MY25" -> "500e") and tidy whitespace.
+// Strip model-year markers anywhere ("500e MY25" -> "500e", "Junior MY25 & MY26" -> "Junior") and
+// tidy the trailing artefacts the source leaves behind (stray comma/ampersand/hyphen, e.g. "C40,"
+// "C-HR Hybrid -"). Meaningful suffixes are preserved: "+" (plug-in, e.g. "NX 450h+") and accents
+// ("Coupé"). Display formatting of a real value, not fabrication — same basis as niceMake above.
 export function cleanModel(raw: string): string {
-  return raw.replace(/\s+MY\d{2,4}\s*$/i, "").replace(/\s+/g, " ").trim();
+  return raw
+    .replace(/\bMY\d{2,4}\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .replace(/[\s,&-]+$/g, "")
+    .trim();
 }
 
 export function normalizeFuel(raw: string): string | null {
