@@ -7,7 +7,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { VariantSpecsCard } from "@/components/cars/VariantSpecsCard";
 import { RecallList } from "@/components/cars/RecallList";
-import { ComplaintList } from "@/components/cars/ComplaintList";
+import { ReliabilityCard } from "@/components/cars/ReliabilityCard";
 
 // Route params come from the URL, so they're external input — validated per the workflow's
 // "Zod validation on every external input" rule, even though they end up in a Prisma `where`
@@ -32,7 +32,7 @@ export async function generateMetadata({
   if (!model || !model.make) return { title: "Car" };
   return {
     title: `${model.make.name} ${model.name} — specs, economy and recalls`,
-    description: `${model.make.name} ${model.name}: specifications, fuel economy, road tax, recalls and owner complaints — every figure source-labelled.`,
+    description: `${model.make.name} ${model.name}: specifications, fuel economy, road tax, recalls and MOT reliability — every figure source-labelled.`,
   };
 }
 
@@ -53,7 +53,7 @@ export default async function ModelPage({
       make: true,
       variants: { orderBy: { year: "desc" } },
       recalls: { orderBy: { recallDate: "desc" } },
-      complaints: { orderBy: { complaintDate: "desc" } },
+      motReliability: { orderBy: { testCount: "desc" } },
     },
   });
 
@@ -97,8 +97,14 @@ export default async function ModelPage({
       </section>
 
       <section className="mt-8">
-        <h2 className="mb-3 text-xl font-semibold text-gray-900">Owner complaints</h2>
-        <ComplaintList complaints={model.complaints} />
+        <h2 className="mb-3 text-xl font-semibold text-gray-900">Reliability</h2>
+        <ReliabilityCard
+          reliability={model.motReliability.map((r) => ({
+            ...r,
+            // Prisma Decimal -> plain value so the presentational card stays Prisma-free.
+            passRate: r.passRate.toString(),
+          }))}
+        />
       </section>
     </main>
   );

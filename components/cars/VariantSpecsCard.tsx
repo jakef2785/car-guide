@@ -64,11 +64,10 @@ export function VariantSpecsCard({ variant }: { variant: Variant }) {
 
       <div className="mb-1 mt-4 flex items-center justify-between">
         <h4 className="text-sm font-semibold text-slate-700">Fuel economy &amp; tax</h4>
-        {/* Fuel economy/CO2 come from the EPA pipeline (scripts/match-epa-fuel-economy.ts), a
-            different source than the specs above (variant.dataSource) — the schema only tracks
-            one data_source per variant row, so this section's source is hardcoded rather than
-            reused from variant.dataSource. See vault decision 0004. */}
-        {hasFuelEconomyData && <SourceTag source="EPA" fetchedAt={fetchedAt} />}
+        {/* For UK (Phase 2.5) data, specs and fuel economy/CO2 both come from VCA in one row, so
+            the section reuses variant.dataSource. (Phase 1 US data sourced economy separately from
+            EPA; the schema still tracks one data_source per variant — see vault decision 0004.) */}
+        {hasFuelEconomyData && <SourceTag source={variant.dataSource} fetchedAt={fetchedAt} />}
       </div>
       <div>
         <Spec label="MPG (urban)" value={variant.mpgUrban} unit=" mpg" />
