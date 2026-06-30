@@ -48,9 +48,13 @@ async function main() {
       unmatched++;
       continue;
     }
-    // Skip exact duplicates so the script is safe to re-run.
+    // Skip exact duplicates so the script is safe to re-run. When there's no campaign reference,
+    // don't treat "both null-ref" as the same recall — distinguish on component+summary so two
+    // genuinely different ref-less recalls on one model aren't merged.
     const existing = await prisma.recall.findFirst({
-      where: { modelId, campaignRef: rec.campaignRef, dataSource: "DVSA" },
+      where: rec.campaignRef
+        ? { modelId, campaignRef: rec.campaignRef, dataSource: "DVSA" }
+        : { modelId, campaignRef: null, component: rec.component, summary: rec.summary, dataSource: "DVSA" },
     });
     if (existing) continue;
 

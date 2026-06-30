@@ -4,7 +4,7 @@ export function SiteFooter() {
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-6">
         <span className="text-base font-medium text-white">CarGuide</span>
         <span className="text-xs text-slate-400">
-          Data sources: CarVector · NHTSA · EPA · GOV.UK VED — US-centric catalogue
+          Data sources: VCA (WLTP) · DVSA recalls · UK MOT reliability · GOV.UK VED bands
         </span>
       </div>
     </footer>

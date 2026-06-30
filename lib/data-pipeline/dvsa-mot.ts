@@ -46,16 +46,31 @@ export class MotAggregator {
   private iModel = -1;
   private iResult = -1;
   private iFailure = -1;
+  private colCount = -1;
+  malformedRows = 0;
 
   setHeader(header: string[]) {
+    this.colCount = header.length;
     this.iMake = indexOfHeader(header, ["make", "manufacturer"]);
     this.iModel = indexOfHeader(header, ["model"]);
     this.iResult = indexOfHeader(header, ["test_result", "result", "testresult"]);
     this.iFailure = indexOfHeader(header, ["failure_category", "rfr_type", "rfr", "failure_reason", "fail_category"]);
+    if (this.iMake < 0 || this.iModel < 0 || this.iResult < 0) {
+      throw new Error(
+        `MOT header missing make/model/test_result columns (got: ${header.slice(0, 12).join(", ")}). Wrong file or delimiter?`,
+      );
+    }
   }
 
   addRow(cols: string[]) {
     if (this.iMake < 0 || this.iModel < 0 || this.iResult < 0) return;
+    // A row whose column count differs from the header almost certainly has an unescaped delimiter
+    // inside a quoted field — its columns are shifted, so reading make/model/result by index would
+    // silently misattribute it. Drop and count it rather than corrupt a real model's tally.
+    if (this.colCount >= 0 && cols.length !== this.colCount) {
+      this.malformedRows++;
+      return;
+    }
     const make = (cols[this.iMake] ?? "").trim();
     const model = (cols[this.iModel] ?? "").trim();
     const result = (cols[this.iResult] ?? "").trim().toUpperCase();
@@ -116,7 +131,9 @@ export async function aggregateMotFile(path: string, opts: { minTests?: number; 
   for await (const line of rl) {
     if (!line) continue;
     if (isHeader) {
-      delim = line.includes("|") && !line.includes(",") ? "|" : ",";
+      // Pick the delimiter that yields more columns, so a stray comma in a pipe-file header (or
+      // vice-versa) doesn't collapse everything into one column.
+      delim = line.split("|").length > line.split(",").length ? "|" : ",";
       agg.setHeader(splitLine(line, delim));
       isHeader = false;
       continue;

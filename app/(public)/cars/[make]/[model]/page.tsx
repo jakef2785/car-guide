@@ -53,7 +53,7 @@ export default async function ModelPage({
       make: true,
       variants: { orderBy: { year: "desc" } },
       recalls: { orderBy: { recallDate: "desc" } },
-      motReliability: { orderBy: { testCount: "desc" } },
+      motReliability: { orderBy: { ageBand: "desc" } },
     },
   });
 
@@ -102,7 +102,8 @@ export default async function ModelPage({
           reliability={model.motReliability.map((r) => ({
             ...r,
             // Prisma Decimal -> plain value so the presentational card stays Prisma-free.
-            passRate: r.passRate.toString(),
+            defectsPer100: r.defectsPer100?.toString() ?? null,
+            yearAvgPer100: r.yearAvgPer100?.toString() ?? null,
           }))}
         />
       </section>

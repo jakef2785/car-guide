@@ -9,6 +9,7 @@ export type SourceKey =
   | "VCA"
   | "DVSA"
   | "DVSA MOT"
+  | "MOT (motsearch)"
   | "VED-computed";
 
 const CAVEATS: Record<SourceKey, string> = {
@@ -18,6 +19,8 @@ const CAVEATS: Record<SourceKey, string> = {
   VCA: "Official UK WLTP figure (VCA carfueldata).",
   DVSA: "Official UK DVSA manufacturer safety recall.",
   "DVSA MOT": "Aggregated from UK MOT test outcomes — a reliability signal, not a manufacturer defect report.",
+  "MOT (motsearch)":
+    "UK MOT outcomes (DVSA data, OGL) via motsearch.co.uk — faults per 100 tests vs the same-year average. A reliability signal, not a manufacturer defect report.",
   "VED-computed": "Computed from CO2 via GOV.UK bands — confirm current rates at GOV.UK.",
 };
 

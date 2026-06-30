@@ -43,11 +43,11 @@ export default async function Home() {
         <div className="mx-auto grid max-w-6xl grid-cols-1 gap-6 px-4 py-8 sm:grid-cols-3">
           <div>
             <h3 className="font-semibold text-gray-900">Every figure is sourced</h3>
-            <p className="mt-1 text-sm text-gray-500">Specs, economy and tax trace to CarVector, EPA and GOV.UK.</p>
+            <p className="mt-1 text-sm text-gray-500">Specs, economy and tax trace to VCA (official UK WLTP) and GOV.UK.</p>
           </div>
           <div>
             <h3 className="font-semibold text-gray-900">Official safety data</h3>
-            <p className="mt-1 text-sm text-gray-500">Recalls and owner complaints come straight from NHTSA.</p>
+            <p className="mt-1 text-sm text-gray-500">Recalls from DVSA; reliability from real UK MOT outcomes.</p>
           </div>
           <div>
             <h3 className="font-semibold text-gray-900">No fabricated data</h3>

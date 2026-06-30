@@ -14,6 +14,10 @@ describe("parseRecallDate", () => {
     expect(parseRecallDate(null)).toBeNull();
     expect(parseRecallDate("not a date")).toBeNull();
   });
+  it("rejects ambiguous 2-digit-year dates and impossible dates instead of guessing", () => {
+    expect(parseRecallDate("05/11/19")).toBeNull(); // would be US-parsed by new Date
+    expect(parseRecallDate("31/02/2020")).toBeNull(); // 31 Feb -> rolled over, rejected
+  });
 });
 
 describe("recallMatchKey", () => {

@@ -145,11 +145,16 @@ model Tsb {
 model MotReliability {
   id            String   @id @default(uuid()) @db.Uuid
   modelId       String?  @map("model_id") @db.Uuid
-  ageBand       String?  @map("age_band") // null = all ages, else e.g. "3-5y"
-  testCount     Int      @map("test_count")
-  passRate      Decimal  @map("pass_rate") @db.Decimal(5, 2) // percent, 0-100
+  ageBand       String?  @map("age_band") // model year, e.g. "2015" (null = all ages)
+  // Faults-per-100-tests signal (motsearch / DVSA MOT): this model-year vs the all-cars average
+  // for the same model year. Lower is better.
+  defectsPer100 Decimal? @map("defects_per_100") @db.Decimal(6, 2)
+  yearAvgPer100 Decimal? @map("year_avg_per_100") @db.Decimal(6, 2)
+  testCount     Int?     @map("test_count")
+  sampleCars    Int?     @map("sample_cars")
+  passRate      Decimal? @map("pass_rate") @db.Decimal(5, 2) // percent 0-100 (DVSA bulk pipeline only)
   topFailures   String[] @map("top_failures") // failure categories, most common first
-  dataSource    String   @map("data_source") // "DVSA MOT"
+  dataSource    String   @map("data_source") // "DVSA MOT" | "MOT (motsearch)"
   dataFetchedAt DateTime @map("data_fetched_at") @db.Timestamptz()
   createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
 

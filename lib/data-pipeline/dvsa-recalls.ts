@@ -35,18 +35,30 @@ function pick(row: Record<string, string>, aliases: string[]): string | null {
   return null;
 }
 
-// DVSA launch dates appear as "dd/mm/yyyy" (UK) or ISO. Returns null on anything unparseable
-// rather than guessing — a wrong date is worse than no date.
+// DVSA launch dates appear as "dd/mm/yyyy" (UK, 4-digit year) or ISO. Returns null on anything
+// else — a wrong date is worse than no date. We never hand an ambiguous string to `new Date`:
+// a 2-digit-year or bare dd/mm would be parsed in US locale (mm/dd) and silently swap day/month.
 export function parseRecallDate(raw: string | null): Date | null {
   if (!raw) return null;
-  const uk = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  const s = raw.trim();
+  const uk = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (uk) {
     const [, d, m, y] = uk;
     const dt = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d)));
-    return Number.isNaN(dt.getTime()) ? null : dt;
+    // Reject rolled-over dates (e.g. 31/02 -> 03 Mar) by round-tripping the components.
+    if (dt.getUTCFullYear() === Number(y) && dt.getUTCMonth() === Number(m) - 1 && dt.getUTCDate() === Number(d)) {
+      return dt;
+    }
+    return null;
   }
-  const iso = new Date(raw);
-  return Number.isNaN(iso.getTime()) ? null : iso;
+  // Strict ISO yyyy-mm-dd only, validated by round-trip.
+  const iso = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) {
+    const ymd = `${iso[1]}-${iso[2]}-${iso[3]}`;
+    const dt = new Date(`${ymd}T00:00:00Z`);
+    if (!Number.isNaN(dt.getTime()) && dt.toISOString().slice(0, 10) === ymd) return dt;
+  }
+  return null;
 }
 
 export function parseDvsaRecallsCsv(path: string): DvsaRecall[] {
@@ -64,12 +76,17 @@ export function parseDvsaRecallsCsv(path: string): DvsaRecall[] {
     const make = pick(r, ["Make", "Manufacturer", "Marque"]);
     const model = pick(r, ["Model", "Models", "Model(s)"]);
     if (!make || !model) continue; // can't match a recall we can't attribute to a make/model
+    const component = pick(r, ["Concern", "Component", "System Affected", "Affected"]);
+    // Don't fall back to "Concern" for summary — when the export has only a Concern column it would
+    // echo the same string into both fields, presenting one value as two distinct facts.
+    let summary = pick(r, ["Defect", "Defect Description", "Description"]);
+    if (summary && summary === component) summary = null;
     out.push({
       make,
       model,
       campaignRef: pick(r, ["Recalls Number", "Recall Number", "Reference", "Campaign", "Campaign Number"]),
-      component: pick(r, ["Concern", "Component", "System Affected", "Affected"]),
-      summary: pick(r, ["Defect", "Defect Description", "Description", "Concern"]),
+      component,
+      summary,
       remedy: pick(r, ["Remedy", "Rectification", "Corrective Action"]),
       recallDate: parseRecallDate(pick(r, ["Launch Date", "Recall Date", "Date", "Date Launched"])),
     });
