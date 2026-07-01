@@ -189,7 +189,7 @@ async function main() {
 
       // Build every row for this model FIRST (the slow per-year HTTP fetches happen with no open DB
       // connection), then write them in one short burst — keeps the DB connection from idling out.
-      const rowsForModel = [];
+      const rowsForModel: Prisma.MotReliabilityCreateManyInput[] = [];
       for (const y of years) {
         let testCount: number | null = null;
         let sampleCars: number | null = null;
