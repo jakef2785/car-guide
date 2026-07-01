@@ -4,7 +4,6 @@ import { SourceTag } from "@/components/ui/SourceTag";
 import { caveatFor } from "@/lib/utils/source-caveats";
 
 type Variant = {
-  year: number;
   trimName: string | null;
   engineSizeCc: number | null;
   fuelType: string | null;
@@ -44,7 +43,7 @@ export function VariantSpecsCard({ variant }: { variant: Variant }) {
     <div className="rounded-lg border border-slate-200 p-4">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-lg font-semibold text-slate-900">
-          {variant.year} {variant.trimName ?? "Standard"}
+          {variant.trimName ?? "Standard"}
         </h3>
         <SourceTag source={variant.dataSource} fetchedAt={fetchedAt} />
       </div>

@@ -1,10 +1,9 @@
-import { listMakes } from "@/lib/cars/queries";
-import { SearchBar } from "@/components/search/SearchBar";
-import { FilterControls } from "@/components/search/FilterControls";
+import { listMakes, listFilterFacets } from "@/lib/cars/queries";
+import { SearchPanel } from "@/components/search/SearchPanel";
 import { MakeTile } from "@/components/cars/MakeTile";
 
 export default async function Home() {
-  const makes = await listMakes();
+  const [makes, facets] = await Promise.all([listMakes(), listFilterFacets()]);
 
   return (
     <main>
@@ -12,13 +11,10 @@ export default async function Home() {
         <div>
           <h1 className="text-4xl font-bold text-gray-900">Find the right car, backed by real data</h1>
           <p className="mt-3 text-lg text-gray-500">
-            Every spec, fuel figure and recall traces to a named source. Nothing is guessed or made up.
+            Every spec, fuel figure, recall and MOT reliability score traces to a named source. Nothing is guessed or made up.
           </p>
-          <div className="mt-6 rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-            <SearchBar />
-            <div className="mt-4 border-t border-gray-200 pt-4">
-              <FilterControls params={{}} layout="grid" />
-            </div>
+          <div className="mt-6">
+            <SearchPanel facets={facets} />
           </div>
         </div>
         <div className="flex h-72 items-center justify-center rounded-xl border border-gray-200 bg-slate-100 text-slate-400 md:h-80">

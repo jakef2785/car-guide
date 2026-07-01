@@ -1,13 +1,16 @@
 // Listing card for one model. Shows only real fields, every figure source-labelled, missing
-// data as "No data available" — never guessed (Guiding-Principles). Image is a placeholder this
-// phase (see vault decision 0009). Composes tested helpers from lib/cars/card-data.
+// data as "No data available" — never guessed (Guiding-Principles). No model year shown: the VCA
+// catalogue has no real per-variant year (see search-params note). Image is a placeholder this
+// phase (vault decision 0009). Composes tested helpers from lib/cars/card-data.
 import Link from "next/link";
 import { SourceTag } from "@/components/ui/SourceTag";
-import { representativeVariant, yearRange, recallCountLabel } from "@/lib/cars/card-data";
+import { representativeVariant, trimCountLabel, recallCountLabel } from "@/lib/cars/card-data";
 
 export type ModelCardVariant = {
-  year: number;
   fuelType: string | null;
+  transmission: string | null;
+  engineSizeCc: number | null;
+  horsepower: number | null;
   mpgCombined: string | null;
   co2Gkm: number | null;
   dataSource: string;
@@ -21,6 +24,7 @@ export type ModelCardModel = {
   modelSlug: string;
   bodyType: string | null;
   recallCount: number;
+  variantCount: number;
   variants: ModelCardVariant[];
 };
 
@@ -30,7 +34,7 @@ function spec(value: string | number | null, unit = ""): string {
 
 export function ModelCard({ model }: { model: ModelCardModel }) {
   const rep = representativeVariant(model.variants);
-  const years = yearRange(model.variants);
+  const trims = trimCountLabel(model.variantCount);
   const recallLabel = recallCountLabel(model.recallCount);
   const href = `/cars/${model.makeSlug}/${model.modelSlug}`;
 
@@ -59,7 +63,7 @@ export function ModelCard({ model }: { model: ModelCardModel }) {
             <p className="mt-1.5 text-sm text-gray-500">
               {spec(rep.fuelType)} · {spec(rep.mpgCombined, " mpg")} · {spec(rep.co2Gkm, " g/km")}
             </p>
-            {years && <p className="mt-1 text-sm text-gray-500">{years}</p>}
+            {trims && <p className="mt-1 text-sm text-gray-400">{trims}</p>}
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {recallLabel && (
                 <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">

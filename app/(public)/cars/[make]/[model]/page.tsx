@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { VariantSpecsCard } from "@/components/cars/VariantSpecsCard";
+import { VariantPicker } from "@/components/cars/VariantPicker";
 import { RecallList } from "@/components/cars/RecallList";
 import { ReliabilityCard } from "@/components/cars/ReliabilityCard";
 
@@ -51,7 +51,7 @@ export default async function ModelPage({
     },
     include: {
       make: true,
-      variants: { orderBy: { year: "desc" } },
+      variants: { orderBy: { trimName: "asc" } },
       recalls: { orderBy: { recallDate: "desc" } },
       motReliability: { orderBy: { ageBand: "desc" } },
     },
@@ -68,27 +68,31 @@ export default async function ModelPage({
 
       <section className="mt-8">
         <h2 className="mb-3 text-xl font-semibold text-gray-900">Specs &amp; fuel economy</h2>
-        {model.variants.length === 0 ? (
-          <p className="text-sm text-gray-500">No variant data available for this model.</p>
-        ) : (
-          <div className="space-y-4">
-            {model.variants.map((variant) => (
-              <VariantSpecsCard
-                key={variant.id}
-                variant={{
-                  ...variant,
-                  // Prisma returns Decimal fields as Decimal objects, not plain numbers/strings —
-                  // convert here so the (otherwise pure-presentational) card component can stay
-                  // independent of the Prisma runtime's Decimal type.
-                  zeroToSixty: variant.zeroToSixty?.toString() ?? null,
-                  mpgUrban: variant.mpgUrban?.toString() ?? null,
-                  mpgExtraUrban: variant.mpgExtraUrban?.toString() ?? null,
-                  mpgCombined: variant.mpgCombined?.toString() ?? null,
-                }}
-              />
-            ))}
-          </div>
-        )}
+        {/* Pick one trim rather than dumping every variant. Prisma Decimals -> strings so the
+            presentational card stays independent of the Prisma runtime's Decimal type. */}
+        <VariantPicker
+          variants={model.variants.map((v) => ({
+            id: v.id,
+            trimName: v.trimName,
+            engineSizeCc: v.engineSizeCc,
+            fuelType: v.fuelType,
+            transmission: v.transmission,
+            horsepower: v.horsepower,
+            torqueNm: v.torqueNm,
+            zeroToSixty: v.zeroToSixty?.toString() ?? null,
+            topSpeedMph: v.topSpeedMph,
+            doors: v.doors,
+            seats: v.seats,
+            kerbWeightKg: v.kerbWeightKg,
+            mpgUrban: v.mpgUrban?.toString() ?? null,
+            mpgExtraUrban: v.mpgExtraUrban?.toString() ?? null,
+            mpgCombined: v.mpgCombined?.toString() ?? null,
+            co2Gkm: v.co2Gkm,
+            vedAnnualGbp: v.vedAnnualGbp,
+            dataSource: v.dataSource,
+            dataFetchedAt: v.dataFetchedAt,
+          }))}
+        />
       </section>
 
       <section className="mt-8">

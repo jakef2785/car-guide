@@ -17,13 +17,16 @@ const base = {
   modelSlug: "honda-cr-v",
   bodyType: "SUV",
   recallCount: 1,
+  variantCount: 1,
   variants: [
     {
-      year: 2023,
       fuelType: "Petrol",
+      transmission: "Automatic",
+      engineSizeCc: 1993,
+      horsepower: 193,
       mpgCombined: "38.0",
       co2Gkm: 152,
-      dataSource: "CarVector",
+      dataSource: "VCA",
       dataFetchedAt: new Date("2026-06-28T00:00:00Z"),
     },
   ],
