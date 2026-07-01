@@ -111,6 +111,17 @@ function num(s: string | undefined | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+// Decode the common HTML entities that appear in motsearch's fault text (e.g. "Wheels &amp; Suspension").
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;|&apos;/g, "'")
+    .replace(/&nbsp;/g, " ");
+}
+
 // Year page: sample size line, headline faults/100, and the "card cat-card" category blocks.
 export function parseYearPage(html: string): YearPageStats {
   const sample = html.match(/Sample size:\s*([\d,]+)\s*cars,\s*([\d,]+)\s*tests\s*and\s*([\d,]+)\s*recorded faults/i);
@@ -123,15 +134,16 @@ export function parseYearPage(html: string): YearPageStats {
   const catSection = catStart >= 0 ? html.slice(catStart) : html;
   const chunks = catSection.split(/card cat-card/).slice(1);
   for (const chunk of chunks) {
-    const name = chunk.match(/class="fw-semibold">([^<]+)</)?.[1]?.trim();
-    if (!name) continue;
+    const nameRaw = chunk.match(/class="fw-semibold">([^<]+)</)?.[1]?.trim();
+    if (!nameRaw) continue;
+    const name = decodeEntities(nameRaw);
     const delta = chunk.match(/(▲|▼)\s*([\d.]+)%\s*(better|worse)/);
     const modelPer100 = num(chunk.match(/([\d.]+)\s*<span[^>]*>\s*faults \/ 100 tests/i)?.[1]);
     const yAvg = num(chunk.match(/Year avg:\s*([\d.]+)\s*\/ 100 tests/i)?.[1]);
     const defects: string[] = [];
     const ul = chunk.match(/<ul class="bullets[^>]*>([\s\S]*?)<\/ul>/i)?.[1] ?? "";
     for (const li of Array.from(ul.matchAll(/<li>([\s\S]*?)<\/li>/gi))) {
-      const d = li[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+      const d = decodeEntities(li[1].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim());
       if (d) defects.push(d);
     }
     let deltaPct: number | null = null;
@@ -152,6 +164,18 @@ export function parseYearPage(html: string): YearPageStats {
   };
 }
 
+// AbortController.abort() asks fetch/undici to cancel — but if the remote end stops sending
+// bytes mid-response without closing the socket, abort doesn't always reliably unblock the
+// awaited promise (an undici/Node edge case). Race against a hard wall-clock timeout too, so a
+// single bad connection can never stall the whole run past timeoutMs+buffer, abort or no abort.
+function withHardTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const guard = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`hard-timeout: ${label}`)), ms);
+  });
+  return Promise.race([p, guard]).finally(() => clearTimeout(timer)) as Promise<T>;
+}
+
 // --- Polite fetch with exponential backoff -----------------------------------
 // Retries transient failures (network error / 429 / 5xx) with 2s,4s,8s backoff so a brief
 // rate-limit doesn't abandon a whole make. 404 and other 4xx are final (no retry).
@@ -167,8 +191,15 @@ export async function fetchHtml(
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
-      const res = await fetch(url, { headers: { "User-Agent": UA, Accept: "text/html" }, signal: ctrl.signal });
-      const html = await res.text();
+      const res = await withHardTimeout(
+        fetch(url, {
+          headers: { "User-Agent": UA, Accept: "text/html", "Accept-Language": "en-GB,en;q=0.9" },
+          signal: ctrl.signal,
+        }),
+        timeoutMs + 5000,
+        "fetch",
+      );
+      const html = await withHardTimeout(res.text(), timeoutMs + 5000, "body read");
       last = { ok: res.ok, status: res.status, html };
       if (res.ok || (res.status !== 429 && res.status < 500)) return last; // final
     } catch {

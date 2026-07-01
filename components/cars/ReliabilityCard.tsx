@@ -26,6 +26,17 @@ function toNum(v: string | number | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+// Decode the few HTML entities that survive scraping (e.g. "Wheels &amp; Suspension").
+function decodeEntities(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;|&apos;/g, "'")
+    .replace(/&nbsp;/g, " ");
+}
+
 function delta(model: number, avg: number) {
   const pct = ((model - avg) / avg) * 100;
   const rounded = Math.round(Math.abs(pct));
@@ -106,7 +117,7 @@ export function ReliabilityCard({ reliability }: { reliability: Reliability[] })
         <div className="mt-4">
           <p className="mb-1 text-sm font-medium text-slate-700">Most common faults ({row.ageBand})</p>
           <ul className="list-inside list-disc space-y-0.5 text-sm text-slate-600">
-            {row.topFailures.map((f) => (
+            {Array.from(new Set(row.topFailures.map(decodeEntities))).map((f) => (
               <li key={f}>{f}</li>
             ))}
           </ul>
