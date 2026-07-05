@@ -13,6 +13,7 @@ export type VcaVariant = {
   trim: string | null;
   engineSizeCc: number | null;
   fuelType: string | null; // normalised: Petrol | Diesel | Hybrid | Electric
+  powertrain: string | null; // raw VCA string, e.g. "Plug-in Hybrid Electric Vehicle (PHEV)"
   transmission: string | null; // Manual | Automatic
   horsepower: number | null; // PS
   mpgUrban: number | null;
@@ -146,6 +147,7 @@ export function parseVcaCsv(path: string): VcaVariant[] {
       trim,
       engineSizeCc: posInt(r["Engine Capacity"]),
       fuelType,
+      powertrain: (r["Powertrain"] || "").replace(/\s+/g, " ").trim() || null,
       transmission: (r["Manual or Automatic"] || "").trim() || null,
       horsepower: posInt(r["Engine Power (PS)"]),
       mpgUrban: posFloat(r["WLTP Imperial Low"]),

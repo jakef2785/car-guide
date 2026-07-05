@@ -166,6 +166,7 @@ async function main() {
         trimName: r.trim,
         engineSizeCc: r.engineSizeCc,
         fuelType: r.fuelType,
+        powertrain: r.powertrain,
         transmission: r.transmission,
         horsepower: r.horsepower,
         mpgUrban: r.mpgUrban,

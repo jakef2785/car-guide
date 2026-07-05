@@ -10,6 +10,7 @@ export function SiteHeader() {
         <nav className="flex gap-7 text-sm font-medium text-slate-300">
           <Link href="/cars" className="hover:text-white">Browse</Link>
           <Link href="/cars" className="hover:text-white">Search</Link>
+          <Link href="/score" className="hover:text-white">Score</Link>
         </nav>
       </div>
     </header>
