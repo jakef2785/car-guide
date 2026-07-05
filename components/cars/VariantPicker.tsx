@@ -28,13 +28,15 @@ export type PickerVariant = {
   dataFetchedAt: Date;
 };
 
-// A human label that disambiguates trims that share a name (adds engine/power/fuel).
+// A human label that disambiguates trims that share a name (adds engine/power/fuel/gearbox —
+// some trims are sold as both manual and automatic, so the gearbox is part of the identity).
 function label(v: PickerVariant): string {
   const parts = [
     v.trimName ?? "Standard",
     v.engineSizeCc ? `${v.engineSizeCc}cc` : null,
     v.horsepower ? `${v.horsepower}ps` : null,
     v.fuelType,
+    v.transmission,
   ].filter(Boolean);
   return parts.join(" · ");
 }

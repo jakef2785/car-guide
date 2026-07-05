@@ -10,14 +10,18 @@
 // "no fabricated data"). VCA has no per-row model year, so every variant is stamped with a single
 // snapshot year (the current on-sale set) — see SNAPSHOT_YEAR below.
 //
-// Recalls (DVSA) and MOT reliability (DVSA MOT) are layered on afterwards by their own scripts
-// (match-dvsa-recalls.ts, match-dvsa-mot.ts) — this script only owns catalogue + VCA economy.
+// SYNC, NOT WIPE: models are upserted by slug and only the variants (which this script wholly
+// owns) are rebuilt. Enrichment layered onto models by other scripts — MOT reliability
+// (scrape-motsearch.ts) and recalls (match-dvsa-recalls.ts) — survives a re-seed. When a model's
+// cleaned name changes (e.g. "HR-V 2023" -> "HR-V"), its enrichment is re-pointed at the renamed
+// model before the stale row is pruned. Pass --wipe for the old scorched-earth behaviour (drops
+// ALL models and their enrichment first — you will need to re-run the enrichment scripts).
 //
-// Run with: node --env-file=.env.local --import tsx scripts/seed.ts
+// Run with: node --env-file=.env.local --import tsx scripts/seed.ts [--wipe]
 
 import path from "path";
 import { PrismaClient } from "@prisma/client";
-import { parseVcaCsv, type VcaVariant } from "../lib/data-pipeline/vca";
+import { parseVcaCsv, cleanModel, type VcaVariant } from "../lib/data-pipeline/vca";
 import { calculateFirstYearVed } from "../lib/data-pipeline/ved";
 
 const prisma = new PrismaClient();
@@ -42,15 +46,14 @@ async function main() {
   const rows: VcaVariant[] = parseVcaCsv(CSV_PATH);
   console.log(`Parsed ${rows.length} unique variants from VCA.`);
 
-  // --- Wipe the old (US placeholder) catalogue. Deleting makes cascades to models and their
-  // variants/recalls/complaints/tsbs/mot rows via the schema's onDelete: Cascade. "Replace, not
-  // augment" — see Phase-2.5-UK-Data-Migration.md. ---
-  console.log("Clearing existing catalogue (cascade delete)...");
-  await prisma.make.deleteMany({});
+  if (process.argv.includes("--wipe")) {
+    console.log("--wipe: clearing existing catalogue (cascade delete, enrichment included)...");
+    await prisma.make.deleteMany({});
+  }
 
   const fetchedAt = new Date();
 
-  // --- Makes: one row per unique display name. ---
+  // --- Makes: one row per unique display name, kept across runs (ids are stable). ---
   const makeNames = Array.from(new Set(rows.map((r) => r.make))).sort();
   await prisma.make.createMany({
     data: makeNames.map((name) => ({ name, slug: slugify(name) })),
@@ -58,9 +61,11 @@ async function main() {
   });
   const makes = await prisma.make.findMany({ select: { id: true, name: true } });
   const makeIdByName = new Map(makes.map((m) => [m.name, m.id]));
-  console.log(`Inserted ${makes.length} makes.`);
+  const makeNameById = new Map(makes.map((m) => [m.id, m.name]));
+  console.log(`Catalogue makes: ${makeNames.length}.`);
 
-  // --- Models: one row per unique (make, model). Slug is make+model so two makes can share a
+  // --- Models: one row per unique (make, model), upserted by slug so existing ids (and the
+  // enrichment hanging off them) are preserved. Slug is make+model so two makes can share a
   // model name without colliding on the global unique slug. First occurrence wins on collision. ---
   const modelBySlug = new Map<string, { makeId: string; name: string; slug: string }>();
   for (const r of rows) {
@@ -70,12 +75,86 @@ async function main() {
     if (!makeId) continue;
     modelBySlug.set(slug, { makeId, name: r.model, slug });
   }
-  await prisma.model.createMany({ data: Array.from(modelBySlug.values()), skipDuplicates: true });
+
+  const existingModels = await prisma.model.findMany({
+    select: { id: true, name: true, slug: true, makeId: true },
+  });
+  const existingSlugs = new Set(existingModels.map((m) => m.slug));
+  const toCreate = Array.from(modelBySlug.values()).filter((m) => !existingSlugs.has(m.slug));
+  await prisma.model.createMany({ data: toCreate, skipDuplicates: true });
   const models = await prisma.model.findMany({ select: { id: true, slug: true } });
   const modelIdBySlug = new Map(models.map((m) => [m.slug, m.id]));
-  console.log(`Inserted ${models.length} models.`);
+  console.log(`Catalogue models: ${modelBySlug.size} (${toCreate.length} new).`);
 
-  // --- Variants: every CSV row, with VCA economy + computed VED. Missing -> null, never faked. ---
+  // --- Migrate enrichment off stale models before pruning them. A model goes stale when its
+  // cleaned name changed (renamed/merged, e.g. "HR-V 2023" -> "HR-V") or VCA dropped it. For a
+  // rename we re-point its MOT reliability / recalls at the successor — unless the successor
+  // already has that data (three "HR-V <year>" donors carry the same motsearch nameplate data;
+  // the richest donor wins, the rest are near-duplicates and die with their stale model). ---
+  const staleModels = existingModels.filter((m) => !modelBySlug.has(m.slug));
+
+  const relCounts = new Map<string, number>();
+  for (const g of await prisma.motReliability.groupBy({ by: ["modelId"], _count: { _all: true } })) {
+    if (g.modelId) relCounts.set(g.modelId, g._count._all);
+  }
+  const recallCounts = new Map<string, number>();
+  for (const g of await prisma.recall.groupBy({ by: ["modelId"], _count: { _all: true } })) {
+    if (g.modelId) recallCounts.set(g.modelId, g._count._all);
+  }
+
+  let movedRel = 0;
+  let movedRecalls = 0;
+  const donors = staleModels
+    .filter((m) => (relCounts.get(m.id) ?? 0) + (recallCounts.get(m.id) ?? 0) > 0)
+    .sort((a, b) => (relCounts.get(b.id) ?? 0) - (relCounts.get(a.id) ?? 0));
+  const relFilled = new Set(
+    (await prisma.motReliability.findMany({ distinct: ["modelId"], select: { modelId: true } }))
+      .map((r) => r.modelId)
+      .filter((id): id is string => id !== null)
+  );
+  const recallFilled = new Set(
+    (await prisma.recall.findMany({ distinct: ["modelId"], select: { modelId: true } }))
+      .map((r) => r.modelId)
+      .filter((id): id is string => id !== null)
+  );
+  for (const stale of donors) {
+    const makeName = stale.makeId ? makeNameById.get(stale.makeId) : null;
+    if (!makeName) continue;
+    const targetSlug = slugify(`${makeName}-${cleanModel(stale.name)}`);
+    const targetId = modelBySlug.has(targetSlug) ? modelIdBySlug.get(targetSlug) : undefined;
+    if (!targetId || targetId === stale.id) continue;
+    if ((relCounts.get(stale.id) ?? 0) > 0 && !relFilled.has(targetId)) {
+      const res = await prisma.motReliability.updateMany({
+        where: { modelId: stale.id },
+        data: { modelId: targetId },
+      });
+      movedRel += res.count;
+      relFilled.add(targetId);
+      console.log(`  reliability: "${stale.name}" -> "${targetSlug}" (${res.count} rows)`);
+    }
+    if ((recallCounts.get(stale.id) ?? 0) > 0 && !recallFilled.has(targetId)) {
+      const res = await prisma.recall.updateMany({
+        where: { modelId: stale.id },
+        data: { modelId: targetId },
+      });
+      movedRecalls += res.count;
+      recallFilled.add(targetId);
+    }
+  }
+
+  // --- Prune models VCA no longer lists (their remaining rows cascade), then empty makes. ---
+  if (staleModels.length > 0) {
+    await prisma.model.deleteMany({ where: { id: { in: staleModels.map((m) => m.id) } } });
+  }
+  const prunedMakes = await prisma.make.deleteMany({ where: { models: { none: {} } } });
+  console.log(
+    `Pruned ${staleModels.length} stale models, ${prunedMakes.count} empty makes; ` +
+      `migrated ${movedRel} reliability rows, ${movedRecalls} recalls.`
+  );
+
+  // --- Variants: wholly owned by this script — rebuilt from scratch every run. Missing -> null,
+  // never faked. ---
+  await prisma.variant.deleteMany({});
   const variantData = rows.flatMap((r) => {
     const modelId = modelIdBySlug.get(slugify(`${r.make}-${r.model}`));
     if (!modelId) return [];
@@ -101,27 +180,44 @@ async function main() {
     ];
   });
 
+  // Final identity guard at the DB boundary: the parser dedupes per cleaned model NAME, but two
+  // names can still land on one model row via slug collision (slugify folds case AND punctuation,
+  // e.g. "ID.7" vs "ID 7"). One row per (model page, trim, engine, fuel, gearbox, power) — that
+  // tuple is exactly what the variant picker shows.
+  const seenIdentity = new Set<string>();
+  const uniqueVariants = variantData.filter((v) => {
+    const key = [v.modelId, v.trimName, v.engineSizeCc, v.fuelType, v.transmission, v.horsepower]
+      .join("|")
+      .toLowerCase();
+    if (seenIdentity.has(key)) return false;
+    seenIdentity.add(key);
+    return true;
+  });
+  if (uniqueVariants.length < variantData.length) {
+    console.log(`Dropped ${variantData.length - uniqueVariants.length} slug-collision duplicate variants.`);
+  }
+
   // createMany in chunks — a single 5k-row insert can exceed the pooled connection's limits.
   const CHUNK = 500;
   let inserted = 0;
-  for (let i = 0; i < variantData.length; i += CHUNK) {
-    const batch = variantData.slice(i, i + CHUNK);
+  for (let i = 0; i < uniqueVariants.length; i += CHUNK) {
+    const batch = uniqueVariants.slice(i, i + CHUNK);
     const res = await prisma.variant.createMany({ data: batch });
     inserted += res.count;
   }
   console.log(`Inserted ${inserted} variants.`);
 
   // --- Coverage report: make data gaps visible rather than silently swallowed. ---
-  const withMpg = variantData.filter((v) => v.mpgCombined !== null).length;
-  const withCo2 = variantData.filter((v) => v.co2Gkm !== null).length;
-  const withHp = variantData.filter((v) => v.horsepower !== null).length;
-  const withEngine = variantData.filter((v) => v.engineSizeCc !== null).length;
-  const pct = (n: number) => `${((n / variantData.length) * 100).toFixed(0)}%`;
+  const withMpg = uniqueVariants.filter((v) => v.mpgCombined !== null).length;
+  const withCo2 = uniqueVariants.filter((v) => v.co2Gkm !== null).length;
+  const withHp = uniqueVariants.filter((v) => v.horsepower !== null).length;
+  const withEngine = uniqueVariants.filter((v) => v.engineSizeCc !== null).length;
+  const pct = (n: number) => `${((n / uniqueVariants.length) * 100).toFixed(0)}%`;
   console.log("\nField coverage (rest left null — not fabricated):");
-  console.log(`  MPG (combined): ${withMpg}/${variantData.length} (${pct(withMpg)})`);
-  console.log(`  CO2:            ${withCo2}/${variantData.length} (${pct(withCo2)})`);
-  console.log(`  Horsepower:     ${withHp}/${variantData.length} (${pct(withHp)})`);
-  console.log(`  Engine size:    ${withEngine}/${variantData.length} (${pct(withEngine)})`);
+  console.log(`  MPG (combined): ${withMpg}/${uniqueVariants.length} (${pct(withMpg)})`);
+  console.log(`  CO2:            ${withCo2}/${uniqueVariants.length} (${pct(withCo2)})`);
+  console.log(`  Horsepower:     ${withHp}/${uniqueVariants.length} (${pct(withHp)})`);
+  console.log(`  Engine size:    ${withEngine}/${uniqueVariants.length} (${pct(withEngine)})`);
 }
 
 main()

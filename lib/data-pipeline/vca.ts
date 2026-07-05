@@ -56,13 +56,20 @@ function title(s: string): string {
     .trim();
 }
 
-// Strip model-year markers anywhere ("500e MY25" -> "500e", "Junior MY25 & MY26" -> "Junior") and
-// tidy the trailing artefacts the source leaves behind (stray comma/ampersand/hyphen, e.g. "C40,"
-// "C-HR Hybrid -"). Meaningful suffixes are preserved: "+" (plug-in, e.g. "NX 450h+") and accents
-// ("Coupé"). Display formatting of a real value, not fabrication — same basis as niceMake above.
+// Strip model-year markers anywhere ("500e MY25" -> "500e", "Vantage 2021MY" -> "Vantage",
+// "A-Class Model Year 2026" -> "A-Class", "Civic 2023" -> "Civic"), the marketing "New " prefix
+// ("New ZOE" -> "ZOE"), and tidy the trailing artefacts the source leaves behind (stray
+// comma/ampersand/hyphen, e.g. "C40," "C-HR Hybrid -"). A year that IS the whole name is kept
+// (Peugeot "2008"/"3008"/"5008") — the trailing-year rule requires something before it.
+// Meaningful suffixes are preserved: "+" (plug-in, e.g. "NX 450h+") and accents ("Coupé").
+// Display formatting of a real value, not fabrication — same basis as niceMake above.
 export function cleanModel(raw: string): string {
   return raw
-    .replace(/\bMY\d{2,4}\b/gi, " ")
+    .replace(/\bmodel year( post)?\s*\d{4}(\.\d+)?/gi, " ") // "Model Year 2026", "Model Year Post 2024.00"
+    .replace(/\bMY\s?\d{2,4}(\.\d+)?\b/gi, " ") // "MY25", "MY 2026"
+    .replace(/\b\d{4}\s?MY\b/gi, " ") // "2021MY"
+    .replace(/^new\s+/i, "") // "New Focus" -> "Focus"
+    .replace(/\s+(19|20)\d{2}\s*$/g, " ") // trailing bare year: "Civic 2023" -> "Civic"
     .replace(/\s+/g, " ")
     .replace(/[\s,&-]+$/g, "")
     .trim();
@@ -102,8 +109,25 @@ export function parseVcaCsv(path: string): VcaVariant[] {
     bom: true,
   });
 
-  const seen = new Set<string>();
-  const out: VcaVariant[] = [];
+  // One variant per user-facing identity (make/model/trim/fuel/engine/power/gearbox). VCA lists
+  // the same trim repeatedly for different test configurations (wheel/equipment lines) whose only
+  // difference is the WLTP figures — a buyer picks a trim, not a test config, so those rows would
+  // render as indistinguishable duplicates. Per identity we keep ONE whole source row (figures are
+  // never mixed across rows): the row with the most economy fields, then the best combined MPG
+  // (the manufacturer-headline configuration), then the lowest CO2, else first occurrence.
+  const byIdentity = new Map<string, VcaVariant>();
+
+  const econFields = ["mpgUrban", "mpgExtraUrban", "mpgCombined", "co2Gkm"] as const;
+  const econCount = (v: VcaVariant) => econFields.filter((f) => v[f] !== null).length;
+  const beats = (a: VcaVariant, b: VcaVariant): boolean => {
+    if (econCount(a) !== econCount(b)) return econCount(a) > econCount(b);
+    const mpgA = a.mpgCombined ?? -1;
+    const mpgB = b.mpgCombined ?? -1;
+    if (mpgA !== mpgB) return mpgA > mpgB;
+    const co2A = a.co2Gkm ?? Number.POSITIVE_INFINITY;
+    const co2B = b.co2Gkm ?? Number.POSITIVE_INFINITY;
+    return co2A < co2B;
+  };
 
   for (const r of records) {
     const make = niceMake(r["Manufacturer"] || "");
@@ -130,11 +154,14 @@ export function parseVcaCsv(path: string): VcaVariant[] {
       co2Gkm,
     };
 
-    const key = [v.make, v.model, v.trim, v.fuelType, v.engineSizeCc, v.horsepower, v.mpgCombined, v.co2Gkm].join("|");
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push(v);
+    // Case-insensitive: model/trim spellings that differ only in case ("Zoe" vs "ZOE") map to the
+    // same URL slug downstream, so they are the same identity here too.
+    const key = [v.make, v.model, v.trim, v.fuelType, v.engineSizeCc, v.horsepower, v.transmission]
+      .join("|")
+      .toLowerCase();
+    const held = byIdentity.get(key);
+    if (!held || beats(v, held)) byIdentity.set(key, v);
   }
 
-  return out;
+  return Array.from(byIdentity.values());
 }
