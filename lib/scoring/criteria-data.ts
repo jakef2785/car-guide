@@ -15,22 +15,32 @@ export const RUNNING_COST_ASSUMPTIONS = {
 } as const;
 
 // Plug-in hybrids report the WLTP *weighted* combined figure (battery assumed charged), which
-// produces 150–1,000+ "mpg" — a different test regime, not comparable with normal combined MPG
-// and wildly unrepresentative of fuel actually bought. Full hybrids (Toyota-style) report a
-// normal combined figure and stay comparable. There is no column flag in our schema, so the
-// regimes are told apart by magnitude: no petrol/diesel/full-hybrid exceeds ~100 WLTP combined
-// mpg, while weighted PHEV figures start well above it. This drops data from comparison rather
-// than inventing any — the raw figure still shows on the detail page.
-const PHEV_WEIGHTED_MPG_THRESHOLD = 120;
+// produces anything from ~40 to 706 "mpg" — a different test regime, not comparable with normal
+// combined MPG and unrepresentative of fuel actually bought. Full hybrids (Toyota-style) report
+// a normal combined figure and stay comparable. The VCA "Powertrain" string tells the regimes
+// apart exactly (PHEV vs HEV/MHEV/ICE); a magnitude guard covers rows without one (no real
+// petrol/diesel/full-hybrid exceeds ~80 WLTP combined mpg). This drops data from comparison
+// rather than inventing any — the raw figure still shows on the detail page.
+const WEIGHTED_REGIME = /plug-?in|phev|range.?extend|ofvs?/i;
+const IMPLAUSIBLE_COMBINED_MPG = 80;
 
-export function comparableMpg(mpgCombined: number | null, fuelType: string | null): number | null {
+export function comparableMpg(
+  mpgCombined: number | null,
+  fuelType: string | null,
+  powertrain: string | null
+): number | null {
   if (mpgCombined === null || mpgCombined <= 0) return null;
-  if (fuelType?.toLowerCase() === "hybrid" && mpgCombined > PHEV_WEIGHTED_MPG_THRESHOLD) return null;
+  if (powertrain) return WEIGHTED_REGIME.test(powertrain) ? null : mpgCombined;
+  if (fuelType?.toLowerCase() === "hybrid" && mpgCombined > IMPLAUSIBLE_COMBINED_MPG) return null;
   return mpgCombined;
 }
 
-export function deriveAnnualFuelCost(mpgCombined: number | null, fuelType: string | null): number | null {
-  const mpg = comparableMpg(mpgCombined, fuelType);
+export function deriveAnnualFuelCost(
+  mpgCombined: number | null,
+  fuelType: string | null,
+  powertrain: string | null
+): number | null {
+  const mpg = comparableMpg(mpgCombined, fuelType, powertrain);
   if (mpg === null || !fuelType) return null;
   const f = fuelType.toLowerCase();
   if (f === "electric") return null;
@@ -43,11 +53,16 @@ export function deriveAnnualFuelCost(mpgCombined: number | null, fuelType: strin
 // Cheapest variant's (first-year VED + annual fuel estimate). Needs BOTH components — a car
 // missing either is "no data", not "cheap".
 export function deriveRunningCost(
-  variants: Array<{ mpgCombined: number | null; fuelType: string | null; vedAnnualGbp: number | null }>
+  variants: Array<{
+    mpgCombined: number | null;
+    fuelType: string | null;
+    powertrain: string | null;
+    vedAnnualGbp: number | null;
+  }>
 ): number | null {
   let best: number | null = null;
   for (const v of variants) {
-    const fuel = deriveAnnualFuelCost(v.mpgCombined, v.fuelType);
+    const fuel = deriveAnnualFuelCost(v.mpgCombined, v.fuelType, v.powertrain);
     if (fuel === null || v.vedAnnualGbp === null) continue;
     const total = v.vedAnnualGbp + fuel;
     if (best === null || total < best) best = total;
@@ -89,6 +104,7 @@ export async function fetchScoringInputs(): Promise<ScoringInput[]> {
             horsepower: true,
             mpgCombined: true,
             fuelType: true,
+            powertrain: true,
             vedAnnualGbp: true,
             dataFetchedAt: true,
           },
@@ -108,6 +124,7 @@ export async function fetchScoringInputs(): Promise<ScoringInput[]> {
       horsepower: v.horsepower,
       mpgCombined: v.mpgCombined === null ? null : Number(v.mpgCombined),
       fuelType: v.fuelType,
+      powertrain: v.powertrain,
       vedAnnualGbp: v.vedAnnualGbp,
     }));
     const rel = m.motReliability.map((r) => ({
@@ -116,7 +133,7 @@ export async function fetchScoringInputs(): Promise<ScoringInput[]> {
     }));
     const power = variants.map((v) => v.horsepower).filter((n): n is number => n !== null);
     const mpg = variants
-      .map((v) => comparableMpg(v.mpgCombined, v.fuelType))
+      .map((v) => comparableMpg(v.mpgCombined, v.fuelType, v.powertrain))
       .filter((n): n is number => n !== null);
     const fetchDates = m.variants.map((v) => v.dataFetchedAt);
 
