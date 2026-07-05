@@ -4,7 +4,6 @@ import { SourceTag } from "@/components/ui/SourceTag";
 import { caveatFor } from "@/lib/utils/source-caveats";
 
 type Variant = {
-  year: number;
   trimName: string | null;
   engineSizeCc: number | null;
   fuelType: string | null;
@@ -44,7 +43,7 @@ export function VariantSpecsCard({ variant }: { variant: Variant }) {
     <div className="rounded-lg border border-slate-200 p-4">
       <div className="mb-2 flex items-center justify-between">
         <h3 className="text-lg font-semibold text-slate-900">
-          {variant.year} {variant.trimName ?? "Standard"}
+          {variant.trimName ?? "Standard"}
         </h3>
         <SourceTag source={variant.dataSource} fetchedAt={fetchedAt} />
       </div>
@@ -64,11 +63,10 @@ export function VariantSpecsCard({ variant }: { variant: Variant }) {
 
       <div className="mb-1 mt-4 flex items-center justify-between">
         <h4 className="text-sm font-semibold text-slate-700">Fuel economy &amp; tax</h4>
-        {/* Fuel economy/CO2 come from the EPA pipeline (scripts/match-epa-fuel-economy.ts), a
-            different source than the specs above (variant.dataSource) — the schema only tracks
-            one data_source per variant row, so this section's source is hardcoded rather than
-            reused from variant.dataSource. See vault decision 0004. */}
-        {hasFuelEconomyData && <SourceTag source="EPA" fetchedAt={fetchedAt} />}
+        {/* For UK (Phase 2.5) data, specs and fuel economy/CO2 both come from VCA in one row, so
+            the section reuses variant.dataSource. (Phase 1 US data sourced economy separately from
+            EPA; the schema still tracks one data_source per variant — see vault decision 0004.) */}
+        {hasFuelEconomyData && <SourceTag source={variant.dataSource} fetchedAt={fetchedAt} />}
       </div>
       <div>
         <Spec label="MPG (urban)" value={variant.mpgUrban} unit=" mpg" />
@@ -77,11 +75,16 @@ export function VariantSpecsCard({ variant }: { variant: Variant }) {
         <Spec label="CO₂ emissions" value={variant.co2Gkm} unit=" g/km" />
         <Spec
           label="First-year VED"
-          value={variant.vedAnnualGbp}
-          unit={variant.vedAnnualGbp !== null ? " £" : ""}
+          value={variant.vedAnnualGbp !== null ? `£${variant.vedAnnualGbp}` : null}
         />
         {variant.vedAnnualGbp !== null && (
-          <p className="pt-1 text-xs text-slate-400">{caveatFor("VED-computed")}</p>
+          <p className="pt-1 text-xs text-slate-400">
+            {/* ved.ts defaults diesels to the higher non-RDE2 band when NOx compliance is unknown
+                (assumptionApplied) — surface that specifically rather than as an exact figure. */}
+            {variant.fuelType === "Diesel"
+              ? "Assumes non-RDE2 diesel — the actual first-year rate may be lower; confirm at GOV.UK."
+              : caveatFor("VED-computed")}
+          </p>
         )}
       </div>
     </div>

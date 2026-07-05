@@ -36,12 +36,13 @@ model Model {
   bodyType  String?  @map("body_type")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz()
 
-  make       Make?       @relation(fields: [makeId], references: [id], onDelete: Cascade)
-  variants   Variant[]
-  recalls    Recall[]
-  complaints Complaint[]
-  tsbs       Tsb[]
-  reviews    Review[]
+  make           Make?            @relation(fields: [makeId], references: [id], onDelete: Cascade)
+  variants       Variant[]
+  recalls        Recall[]
+  complaints     Complaint[]
+  tsbs           Tsb[]
+  reviews        Review[]
+  motReliability MotReliability[]
 
   @@map("models")
 }
@@ -84,7 +85,9 @@ model Variant {
 model Recall {
   id              String    @id @default(uuid()) @db.Uuid
   modelId         String?   @map("model_id") @db.Uuid
-  nhtsaCampaignId String?   @map("nhtsa_campaign_id")
+  // Generic recall reference — holds an NHTSA campaign number (US/CarVector data) or a DVSA
+  // recall reference (UK). Distinguish by dataSource. Renamed from nhtsaCampaignId in Phase 2.5.
+  campaignRef     String?   @map("campaign_ref")
   yearFrom        Int?      @map("year_from")
   yearTo          Int?      @map("year_to")
   component       String?
@@ -134,6 +137,30 @@ model Tsb {
   model Model? @relation(fields: [modelId], references: [id], onDelete: Cascade)
 
   @@map("tsbs")
+}
+
+// DVSA MOT-derived reliability signal — aggregated pass rate + top failure categories per model
+// (optionally per age band). Replaces US owner-complaints as the UK reliability indicator.
+// See vault 02-Phases/Phase-2.5-UK-Data-Migration.md. Source: DVSA Anonymised MOT data.
+model MotReliability {
+  id            String   @id @default(uuid()) @db.Uuid
+  modelId       String?  @map("model_id") @db.Uuid
+  ageBand       String?  @map("age_band") // model year, e.g. "2015" (null = all ages)
+  // Faults-per-100-tests signal (motsearch / DVSA MOT): this model-year vs the all-cars average
+  // for the same model year. Lower is better.
+  defectsPer100 Decimal? @map("defects_per_100") @db.Decimal(6, 2)
+  yearAvgPer100 Decimal? @map("year_avg_per_100") @db.Decimal(6, 2)
+  testCount     Int?     @map("test_count")
+  sampleCars    Int?     @map("sample_cars")
+  passRate      Decimal? @map("pass_rate") @db.Decimal(5, 2) // percent 0-100 (DVSA bulk pipeline only)
+  topFailures   String[] @map("top_failures") // failure categories, most common first
+  dataSource    String   @map("data_source") // "DVSA MOT" | "MOT (motsearch)"
+  dataFetchedAt DateTime @map("data_fetched_at") @db.Timestamptz()
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz()
+
+  model Model? @relation(fields: [modelId], references: [id], onDelete: Cascade)
+
+  @@map("mot_reliability")
 }
 
 // ---------------------------------------------------------------------------

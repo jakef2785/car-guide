@@ -2,7 +2,7 @@ import { SourceTag } from "@/components/ui/SourceTag";
 
 type Recall = {
   id: string;
-  nhtsaCampaignId: string | null;
+  campaignRef: string | null;
   component: string | null;
   summary: string | null;
   consequence: string | null;
@@ -24,7 +24,7 @@ export function RecallList({ recalls }: { recalls: Recall[] }) {
           <div className="mb-1 flex items-center justify-between gap-2">
             <span className="font-medium text-slate-900">
               {recall.component ?? "Unspecified component"}
-              {recall.nhtsaCampaignId ? ` — Campaign ${recall.nhtsaCampaignId}` : ""}
+              {recall.campaignRef ? ` — Campaign ${recall.campaignRef}` : ""}
             </span>
             <SourceTag source={recall.dataSource} fetchedAt={new Date(recall.dataFetchedAt)} />
           </div>
