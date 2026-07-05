@@ -1,24 +1,29 @@
-import { representativeVariant, yearRange, recallCountLabel } from "@/lib/cars/card-data";
+import { representativeVariant, trimCountLabel, recallCountLabel } from "@/lib/cars/card-data";
 
 describe("representativeVariant", () => {
   it("returns null for no variants", () => {
     expect(representativeVariant([])).toBeNull();
   });
-  it("returns the latest-year variant", () => {
-    const v = representativeVariant([{ year: 2019 }, { year: 2023 }, { year: 2021 }]);
-    expect(v).toEqual({ year: 2023 });
+  it("prefers a variant that has fuel-economy data", () => {
+    const v = representativeVariant([
+      { mpgCombined: null },
+      { mpgCombined: "48.7" },
+    ]);
+    expect(v).toEqual({ mpgCombined: "48.7" });
+  });
+  it("falls back to the first variant when none have mpg", () => {
+    expect(representativeVariant([{ mpgCombined: null }, { mpgCombined: null }])).toEqual({ mpgCombined: null });
   });
 });
 
-describe("yearRange", () => {
-  it("returns null for no variants", () => {
-    expect(yearRange([])).toBeNull();
+describe("trimCountLabel", () => {
+  it("returns null for zero or negative", () => {
+    expect(trimCountLabel(0)).toBeNull();
+    expect(trimCountLabel(-1)).toBeNull();
   });
-  it("returns a single year when min === max", () => {
-    expect(yearRange([{ year: 2020 }])).toBe("2020");
-  });
-  it("returns an en-dashed range", () => {
-    expect(yearRange([{ year: 2019 }, { year: 2023 }])).toBe("2019–2023");
+  it("singular and plural", () => {
+    expect(trimCountLabel(1)).toBe("1 trim");
+    expect(trimCountLabel(6)).toBe("6 trims");
   });
 });
 

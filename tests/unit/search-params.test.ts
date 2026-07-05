@@ -5,20 +5,55 @@ describe("parseCarSearchParams", () => {
     expect(parseCarSearchParams({})).toEqual({});
   });
   it("trims and keeps valid string params", () => {
-    expect(parseCarSearchParams({ q: "  CR-V ", fuel: "Petrol", body: "SUV" })).toEqual({
-      q: "CR-V",
+    expect(parseCarSearchParams({ q: "  Golf ", make: "Volkswagen", fuel: "Petrol", transmission: "Manual", body: "SUV" })).toEqual({
+      q: "Golf",
+      make: "Volkswagen",
       fuel: "Petrol",
+      transmission: "Manual",
       body: "SUV",
     });
   });
-  it("coerces numeric year params", () => {
-    expect(parseCarSearchParams({ yearFrom: "2018", yearTo: "2023" })).toEqual({
-      yearFrom: 2018,
-      yearTo: 2023,
+  it("coerces numeric range params", () => {
+    expect(parseCarSearchParams({ engineFrom: "1000", engineTo: "2000", powerFrom: "90", powerTo: "300", mpgMin: "40", co2Max: "120" })).toEqual({
+      engineFrom: 1000,
+      engineTo: 2000,
+      powerFrom: 90,
+      powerTo: 300,
+      mpgMin: 40,
+      co2Max: 120,
     });
   });
+  it("accepts the reliability and sort enums, ignoring bogus values", () => {
+    expect(parseCarSearchParams({ reliability: "better", sort: "mpg" })).toEqual({ reliability: "better", sort: "mpg" });
+    expect(parseCarSearchParams({ reliability: "nonsense", sort: "sideways" })).toEqual({});
+  });
   it("ignores invalid params instead of throwing", () => {
-    expect(parseCarSearchParams({ yearFrom: "banana", q: "" })).toEqual({});
+    expect(parseCarSearchParams({ engineFrom: "banana", q: "" })).toEqual({});
+  });
+  it("treats empty-string numeric params as absent, not zero (the filter form submits every field)", () => {
+    // A plain GET form sends ?fuel=Petrol&engineTo=&co2Max=... — the empty numerics must not
+    // become 0 (engineTo=0 / co2Max=0 would exclude every car with data).
+    expect(
+      parseCarSearchParams({
+        q: "",
+        make: "",
+        fuel: "Petrol",
+        transmission: "",
+        engineFrom: "",
+        engineTo: "",
+        powerFrom: "",
+        powerTo: "",
+        mpgMin: "",
+        co2Max: "",
+        sort: "",
+      })
+    ).toEqual({ fuel: "Petrol" });
+  });
+  it("treats whitespace-only numeric params as absent", () => {
+    expect(parseCarSearchParams({ co2Max: "  " })).toEqual({});
+  });
+  it("still accepts a genuine zero", () => {
+    expect(parseCarSearchParams({ co2Max: "0" })).toEqual({ co2Max: 0 });
   });
   it("takes the first value when given an array", () => {
     expect(parseCarSearchParams({ q: ["a", "b"] })).toEqual({ q: "a" });
@@ -41,7 +76,10 @@ describe("buildModelWhere", () => {
       ],
     });
   });
-  it("matches body at the model level", () => {
+  it("matches make at the make level and body at the model level", () => {
+    expect(buildModelWhere({ make: "Ford" })).toEqual({
+      AND: [{ make: { name: { equals: "Ford", mode: "insensitive" } } }],
+    });
     expect(buildModelWhere({ body: "SUV" })).toEqual({
       AND: [{ bodyType: { equals: "SUV", mode: "insensitive" } }],
     });
@@ -51,15 +89,27 @@ describe("buildModelWhere", () => {
       AND: [{ variants: { some: { fuelType: { equals: "Diesel", mode: "insensitive" } } } }],
     });
   });
-  it("matches a year range against any variant", () => {
-    expect(buildModelWhere({ yearFrom: 2018, yearTo: 2022 })).toEqual({
-      AND: [{ variants: { some: { year: { gte: 2018, lte: 2022 } } } }],
+  it("folds engine/power ranges and mpg/co2 into one variant clause", () => {
+    expect(buildModelWhere({ engineFrom: 1000, engineTo: 2000, powerFrom: 100, mpgMin: 45, co2Max: 120 })).toEqual({
+      AND: [
+        {
+          variants: {
+            some: {
+              engineSizeCc: { gte: 1000, lte: 2000 },
+              horsepower: { gte: 100 },
+              mpgCombined: { gte: 45 },
+              co2Gkm: { lte: 120 },
+            },
+          },
+        },
+      ],
     });
   });
-  it("combines fuel and year into one variant clause", () => {
-    expect(buildModelWhere({ fuel: "Hybrid", yearFrom: 2020 })).toEqual({
+  it("combines make (model-level) and fuel (variant-level) into separate AND clauses", () => {
+    expect(buildModelWhere({ make: "Kia", fuel: "Hybrid" })).toEqual({
       AND: [
-        { variants: { some: { fuelType: { equals: "Hybrid", mode: "insensitive" }, year: { gte: 2020 } } } },
+        { make: { name: { equals: "Kia", mode: "insensitive" } } },
+        { variants: { some: { fuelType: { equals: "Hybrid", mode: "insensitive" } } } },
       ],
     });
   });

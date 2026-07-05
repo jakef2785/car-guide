@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
 import { parseCarSearchParams } from "@/lib/cars/search-params";
-import { listModels } from "@/lib/cars/queries";
+import { listModels, listFilterFacets } from "@/lib/cars/queries";
 import { ModelCard } from "@/components/cars/ModelCard";
-import { SearchBar } from "@/components/search/SearchBar";
-import { FilterControls } from "@/components/search/FilterControls";
+import { FilterSidebar } from "@/components/search/FilterSidebar";
 
 export const metadata: Metadata = {
-  title: "Browse cars",
-  description: "Browse and filter cars by fuel type, body type and year — every figure source-labelled.",
+  title: "Search cars",
+  description: "Filter UK cars by make, fuel, gearbox, engine, power, economy, emissions and MOT reliability — every figure source-labelled.",
 };
 
 export default async function CarsPage({
@@ -16,35 +15,26 @@ export default async function CarsPage({
   searchParams: Record<string, string | string[] | undefined>;
 }) {
   const params = parseCarSearchParams(searchParams);
-  const models = await listModels(params);
+  const [models, facets] = await Promise.all([listModels(params), listFilterFacets()]);
 
   return (
     <main className="mx-auto max-w-6xl px-4 py-8">
-      <h1 className="mb-6 text-3xl font-bold text-gray-900">Browse cars</h1>
-      <div className="mb-6">
-        <SearchBar defaultValue={params.q ?? ""} />
-      </div>
+      <h1 className="mb-6 text-3xl font-bold text-gray-900">Search cars</h1>
 
-      <div className="grid grid-cols-1 gap-6 md:grid-cols-[230px_1fr]">
-        <aside className="self-start rounded-xl border border-gray-200 bg-white p-5">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-[260px_1fr]">
+        <aside className="self-start rounded-xl border border-gray-200 bg-white p-5 md:sticky md:top-4">
           <h2 className="mb-4 text-base font-bold text-gray-900">Filters</h2>
-          <FilterControls params={params} />
-          <div className="mt-3 text-center">
-            <a href="/cars" className="text-sm text-blue-600 hover:text-blue-700">Clear all</a>
-          </div>
+          <FilterSidebar params={params} facets={facets} />
         </aside>
 
         <section>
           <p className="mb-4 text-sm text-gray-500">
-            {models.length} {models.length === 1 ? "car" : "cars"}
+            {models.length} {models.length === 1 ? "model" : "models"}
           </p>
           {models.length === 0 ? (
             <div className="rounded-xl border border-gray-200 bg-white p-8 text-center">
               <p className="text-gray-900">No cars match these filters.</p>
-              <a
-                href="/cars"
-                className="mt-2 inline-block text-sm font-semibold text-blue-600 hover:text-blue-700"
-              >
+              <a href="/cars" className="mt-2 inline-block text-sm font-semibold text-blue-600 hover:text-blue-700">
                 Clear filters
               </a>
             </div>

@@ -9,7 +9,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 export const metadata: Metadata = {
   title: { default: "CarGuide — car research backed by real data", template: "%s | CarGuide" },
   description:
-    "Browse and search cars with specs, fuel economy, recalls and complaints — every figure traced to a named source.",
+    "Browse and search cars with specs, fuel economy, recalls and MOT reliability — every figure traced to a named source.",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

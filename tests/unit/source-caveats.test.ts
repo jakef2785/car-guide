@@ -8,6 +8,12 @@ describe("caveatFor", () => {
     expect(caveatFor("NHTSA")).toBe("US federal data only.");
   });
 
+  it("documents the UK Phase 2.5 sources", () => {
+    expect(caveatFor("VCA")).toMatch(/WLTP/);
+    expect(caveatFor("DVSA")).toMatch(/recall/i);
+    expect(caveatFor("DVSA MOT")).toMatch(/reliability signal/i);
+  });
+
   it("falls back to a verify-before-relying warning for an undocumented source", () => {
     expect(caveatFor("SomeNewSource")).toMatch(/not documented/);
   });

@@ -5,9 +5,9 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { VariantSpecsCard } from "@/components/cars/VariantSpecsCard";
+import { VariantPicker } from "@/components/cars/VariantPicker";
 import { RecallList } from "@/components/cars/RecallList";
-import { ComplaintList } from "@/components/cars/ComplaintList";
+import { ReliabilityCard } from "@/components/cars/ReliabilityCard";
 
 // Route params come from the URL, so they're external input — validated per the workflow's
 // "Zod validation on every external input" rule, even though they end up in a Prisma `where`
@@ -32,7 +32,7 @@ export async function generateMetadata({
   if (!model || !model.make) return { title: "Car" };
   return {
     title: `${model.make.name} ${model.name} — specs, economy and recalls`,
-    description: `${model.make.name} ${model.name}: specifications, fuel economy, road tax, recalls and owner complaints — every figure source-labelled.`,
+    description: `${model.make.name} ${model.name}: specifications, fuel economy, road tax, recalls and MOT reliability — every figure source-labelled.`,
   };
 }
 
@@ -51,9 +51,9 @@ export default async function ModelPage({
     },
     include: {
       make: true,
-      variants: { orderBy: { year: "desc" } },
+      variants: { orderBy: { trimName: "asc" } },
       recalls: { orderBy: { recallDate: "desc" } },
-      complaints: { orderBy: { complaintDate: "desc" } },
+      motReliability: { orderBy: { ageBand: "desc" } },
     },
   });
 
@@ -68,27 +68,31 @@ export default async function ModelPage({
 
       <section className="mt-8">
         <h2 className="mb-3 text-xl font-semibold text-gray-900">Specs &amp; fuel economy</h2>
-        {model.variants.length === 0 ? (
-          <p className="text-sm text-gray-500">No variant data available for this model.</p>
-        ) : (
-          <div className="space-y-4">
-            {model.variants.map((variant) => (
-              <VariantSpecsCard
-                key={variant.id}
-                variant={{
-                  ...variant,
-                  // Prisma returns Decimal fields as Decimal objects, not plain numbers/strings —
-                  // convert here so the (otherwise pure-presentational) card component can stay
-                  // independent of the Prisma runtime's Decimal type.
-                  zeroToSixty: variant.zeroToSixty?.toString() ?? null,
-                  mpgUrban: variant.mpgUrban?.toString() ?? null,
-                  mpgExtraUrban: variant.mpgExtraUrban?.toString() ?? null,
-                  mpgCombined: variant.mpgCombined?.toString() ?? null,
-                }}
-              />
-            ))}
-          </div>
-        )}
+        {/* Pick one trim rather than dumping every variant. Prisma Decimals -> strings so the
+            presentational card stays independent of the Prisma runtime's Decimal type. */}
+        <VariantPicker
+          variants={model.variants.map((v) => ({
+            id: v.id,
+            trimName: v.trimName,
+            engineSizeCc: v.engineSizeCc,
+            fuelType: v.fuelType,
+            transmission: v.transmission,
+            horsepower: v.horsepower,
+            torqueNm: v.torqueNm,
+            zeroToSixty: v.zeroToSixty?.toString() ?? null,
+            topSpeedMph: v.topSpeedMph,
+            doors: v.doors,
+            seats: v.seats,
+            kerbWeightKg: v.kerbWeightKg,
+            mpgUrban: v.mpgUrban?.toString() ?? null,
+            mpgExtraUrban: v.mpgExtraUrban?.toString() ?? null,
+            mpgCombined: v.mpgCombined?.toString() ?? null,
+            co2Gkm: v.co2Gkm,
+            vedAnnualGbp: v.vedAnnualGbp,
+            dataSource: v.dataSource,
+            dataFetchedAt: v.dataFetchedAt,
+          }))}
+        />
       </section>
 
       <section className="mt-8">
@@ -97,8 +101,15 @@ export default async function ModelPage({
       </section>
 
       <section className="mt-8">
-        <h2 className="mb-3 text-xl font-semibold text-gray-900">Owner complaints</h2>
-        <ComplaintList complaints={model.complaints} />
+        <h2 className="mb-3 text-xl font-semibold text-gray-900">Reliability</h2>
+        <ReliabilityCard
+          reliability={model.motReliability.map((r) => ({
+            ...r,
+            // Prisma Decimal -> plain value so the presentational card stays Prisma-free.
+            defectsPer100: r.defectsPer100?.toString() ?? null,
+            yearAvgPer100: r.yearAvgPer100?.toString() ?? null,
+          }))}
+        />
       </section>
     </main>
   );
