@@ -35,7 +35,15 @@ function first(value: string | string[] | undefined): string | undefined {
 }
 
 const str = z.string().trim().min(1).max(100).optional().catch(undefined);
-const posNum = z.coerce.number().min(0).max(100000).optional().catch(undefined);
+// Empty/whitespace strings mean "absent", NOT zero — a plain GET form submits every field, so
+// ?fuel=Petrol&engineTo=&co2Max=… must not become engineTo:0/co2Max:0 (which would exclude every
+// car with data; z.coerce.number alone does Number("") === 0).
+const posNum = z
+  .preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+    z.coerce.number().min(0).max(100000).optional()
+  )
+  .catch(undefined);
 
 export function parseCarSearchParams(raw: RawParams): CarSearchParams {
   const out: CarSearchParams = {};

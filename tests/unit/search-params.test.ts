@@ -30,6 +30,31 @@ describe("parseCarSearchParams", () => {
   it("ignores invalid params instead of throwing", () => {
     expect(parseCarSearchParams({ engineFrom: "banana", q: "" })).toEqual({});
   });
+  it("treats empty-string numeric params as absent, not zero (the filter form submits every field)", () => {
+    // A plain GET form sends ?fuel=Petrol&engineTo=&co2Max=... — the empty numerics must not
+    // become 0 (engineTo=0 / co2Max=0 would exclude every car with data).
+    expect(
+      parseCarSearchParams({
+        q: "",
+        make: "",
+        fuel: "Petrol",
+        transmission: "",
+        engineFrom: "",
+        engineTo: "",
+        powerFrom: "",
+        powerTo: "",
+        mpgMin: "",
+        co2Max: "",
+        sort: "",
+      })
+    ).toEqual({ fuel: "Petrol" });
+  });
+  it("treats whitespace-only numeric params as absent", () => {
+    expect(parseCarSearchParams({ co2Max: "  " })).toEqual({});
+  });
+  it("still accepts a genuine zero", () => {
+    expect(parseCarSearchParams({ co2Max: "0" })).toEqual({ co2Max: 0 });
+  });
   it("takes the first value when given an array", () => {
     expect(parseCarSearchParams({ q: ["a", "b"] })).toEqual({ q: "a" });
   });
