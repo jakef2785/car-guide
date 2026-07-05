@@ -14,13 +14,29 @@ export const RUNNING_COST_ASSUMPTIONS = {
   litresPerGallon: 4.54609, // imperial
 } as const;
 
+// Plug-in hybrids report the WLTP *weighted* combined figure (battery assumed charged), which
+// produces 150–1,000+ "mpg" — a different test regime, not comparable with normal combined MPG
+// and wildly unrepresentative of fuel actually bought. Full hybrids (Toyota-style) report a
+// normal combined figure and stay comparable. There is no column flag in our schema, so the
+// regimes are told apart by magnitude: no petrol/diesel/full-hybrid exceeds ~100 WLTP combined
+// mpg, while weighted PHEV figures start well above it. This drops data from comparison rather
+// than inventing any — the raw figure still shows on the detail page.
+const PHEV_WEIGHTED_MPG_THRESHOLD = 120;
+
+export function comparableMpg(mpgCombined: number | null, fuelType: string | null): number | null {
+  if (mpgCombined === null || mpgCombined <= 0) return null;
+  if (fuelType?.toLowerCase() === "hybrid" && mpgCombined > PHEV_WEIGHTED_MPG_THRESHOLD) return null;
+  return mpgCombined;
+}
+
 export function deriveAnnualFuelCost(mpgCombined: number | null, fuelType: string | null): number | null {
-  if (mpgCombined === null || mpgCombined <= 0 || !fuelType) return null;
+  const mpg = comparableMpg(mpgCombined, fuelType);
+  if (mpg === null || !fuelType) return null;
   const f = fuelType.toLowerCase();
   if (f === "electric") return null;
   const pricePerLitre =
     f === "diesel" ? RUNNING_COST_ASSUMPTIONS.dieselPricePerLitre : RUNNING_COST_ASSUMPTIONS.petrolPricePerLitre;
-  const gallons = RUNNING_COST_ASSUMPTIONS.annualMiles / mpgCombined;
+  const gallons = RUNNING_COST_ASSUMPTIONS.annualMiles / mpg;
   return gallons * RUNNING_COST_ASSUMPTIONS.litresPerGallon * pricePerLitre;
 }
 
@@ -99,7 +115,9 @@ export async function fetchScoringInputs(): Promise<ScoringInput[]> {
       yearAvgPer100: r.yearAvgPer100 === null ? null : Number(r.yearAvgPer100),
     }));
     const power = variants.map((v) => v.horsepower).filter((n): n is number => n !== null);
-    const mpg = variants.map((v) => v.mpgCombined).filter((n): n is number => n !== null);
+    const mpg = variants
+      .map((v) => comparableMpg(v.mpgCombined, v.fuelType))
+      .filter((n): n is number => n !== null);
     const fetchDates = m.variants.map((v) => v.dataFetchedAt);
 
     return {

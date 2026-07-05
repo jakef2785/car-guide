@@ -1,4 +1,5 @@
 import {
+  comparableMpg,
   deriveAnnualFuelCost,
   deriveRunningCost,
   deriveReliabilityRatio,
@@ -19,6 +20,14 @@ describe("deriveAnnualFuelCost", () => {
     expect(deriveAnnualFuelCost(null, "Petrol")).toBeNull();
     expect(deriveAnnualFuelCost(50, "Electric")).toBeNull();
     expect(deriveAnnualFuelCost(0, "Petrol")).toBeNull();
+  });
+});
+
+describe("comparableMpg (PHEV weighted-test figures are a different measurement, not comparable)", () => {
+  it("keeps petrol/diesel and full-hybrid combined MPG, drops plug-in weighted-test MPG", () => {
+    expect(comparableMpg(52.3, "Hybrid")).toBe(52.3); // full hybrid, normal combined figure
+    expect(comparableMpg(706.3, "Hybrid")).toBeNull(); // PHEV weighted-test artefact
+    expect(comparableMpg(45.6, "Petrol")).toBe(45.6);
   });
 });
 
