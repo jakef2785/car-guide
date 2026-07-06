@@ -193,6 +193,8 @@ async function main() {
         mpgExtraUrban: r.mpgExtraUrban,
         mpgCombined: r.mpgCombined,
         co2Gkm: r.co2Gkm,
+        milesPerKwh: r.milesPerKwh,
+        maxRangeMiles: r.maxRangeMiles,
         // VED is meaningful only where we have CO2 (its input). EV co2=0 -> the £10 band.
         vedAnnualGbp: r.co2Gkm !== null ? ved.firstYearRateGbp : null,
         dataSource: "VCA",

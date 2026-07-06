@@ -55,7 +55,7 @@ describe("cleanModel", () => {
 // --- parseVcaCsv: one variant per user-facing identity ---------------------------------------
 
 const HEADER =
-  "Manufacturer,Model,Description,Transmission,Manual or Automatic,Engine Capacity,Fuel Type,Engine Power (PS),WLTP Imperial Low,WLTP Imperial Extra High,WLTP Imperial Combined,WLTP Imperial Combined (Weighted),WLTP CO2";
+  "Manufacturer,Model,Description,Transmission,Manual or Automatic,Engine Capacity,Fuel Type,Engine Power (PS),WLTP Imperial Low,WLTP Imperial Extra High,WLTP Imperial Combined,WLTP Imperial Combined (Weighted),WLTP CO2,Electric energy consumption Miles/kWh,Maximum range (Miles)";
 
 function csvFile(rows: string[]): string {
   const dir = mkdtempSync(path.join(tmpdir(), "vca-test-"));
@@ -116,6 +116,28 @@ describe("parseVcaCsv identity collapse", () => {
     const out = parseVcaCsv(file);
     expect(out).toHaveLength(1);
     expect(out[0].model).toBe("HR-V");
+  });
+});
+
+describe("parseVcaCsv EV efficiency + range", () => {
+  it("parses Miles/kWh and max range for an EV row", () => {
+    const file = csvFile([
+      "TESLA,Model 3,Long Range AWD,A1,Automatic,0,Electricity,,,,,,0,4.1,340",
+    ]);
+    const out = parseVcaCsv(file);
+    expect(out[0]).toMatchObject({ milesPerKwh: 4.1, maxRangeMiles: 340 });
+  });
+  it("leaves both null for a combustion row (no fabricated efficiency)", () => {
+    const file = csvFile(["FORD,Puma,1.0 EcoBoost,M6,Manual,999,Petrol,125,40.1,55.2,47.9,,133"]);
+    const out = parseVcaCsv(file);
+    expect(out[0]).toMatchObject({ milesPerKwh: null, maxRangeMiles: null });
+  });
+  it("treats a 0 value as not-reported, not a real zero", () => {
+    const file = csvFile([
+      "TESLA,Model 3,Long Range AWD,A1,Automatic,0,Electricity,,,,,,0,0,0",
+    ]);
+    const out = parseVcaCsv(file);
+    expect(out[0]).toMatchObject({ milesPerKwh: null, maxRangeMiles: null });
   });
 });
 

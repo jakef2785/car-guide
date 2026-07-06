@@ -19,6 +19,8 @@ type Variant = {
   mpgExtraUrban: string | number | null;
   mpgCombined: string | number | null;
   co2Gkm: number | null;
+  milesPerKwh: string | number | null;
+  maxRangeMiles: number | null;
   vedAnnualGbp: number | null;
   dataSource: string;
   dataFetchedAt: Date;
@@ -72,6 +74,14 @@ export function VariantSpecsCard({ variant }: { variant: Variant }) {
         <Spec label="MPG (urban)" value={variant.mpgUrban} unit=" mpg" />
         <Spec label="MPG (extra-urban)" value={variant.mpgExtraUrban} unit=" mpg" />
         <Spec label="MPG (combined)" value={variant.mpgCombined} unit=" mpg" />
+        {/* Electric rows only when the variant actually has them (EV/PHEV) — an ICE card
+            shouldn't grow two more "No data available" lines. */}
+        {(variant.milesPerKwh !== null || variant.maxRangeMiles !== null) && (
+          <>
+            <Spec label="Efficiency" value={variant.milesPerKwh} unit=" mi/kWh" />
+            <Spec label="Electric range" value={variant.maxRangeMiles} unit=" miles" />
+          </>
+        )}
         <Spec label="CO₂ emissions" value={variant.co2Gkm} unit=" g/km" />
         <Spec
           label="First-year VED"

@@ -23,6 +23,8 @@ export type PickerVariant = {
   mpgExtraUrban: string | number | null;
   mpgCombined: string | number | null;
   co2Gkm: number | null;
+  milesPerKwh: string | number | null;
+  maxRangeMiles: number | null;
   vedAnnualGbp: number | null;
   dataSource: string;
   dataFetchedAt: Date;

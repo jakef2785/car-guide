@@ -38,7 +38,7 @@ export const CRITERION_LABELS: Record<CriterionKey, string> = {
 export const CRITERION_SOURCES: Record<CriterionKey, string> = {
   performance: "VCA (engine power)",
   economy: "VCA (WLTP combined MPG)",
-  runningCost: "VCA MPG + GOV.UK VED bands + stated assumptions",
+  runningCost: "VCA MPG / mi-per-kWh + GOV.UK VED bands + stated assumptions",
   reliability: "UK MOT results (DVSA data via motsearch)",
   recalls: "DVSA recalls",
 };

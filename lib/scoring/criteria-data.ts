@@ -12,6 +12,10 @@ export const RUNNING_COST_ASSUMPTIONS = {
   petrolPricePerLitre: 1.42,
   dieselPricePerLitre: 1.49,
   litresPerGallon: 4.54609, // imperial
+  // Ofgem price cap unit rate, 1 Jul–30 Sep 2026, standard variable tariff paid by Direct
+  // Debit (GB average, incl. 5% VAT). Home charging at the capped rate — no public-charger or
+  // off-peak-tariff assumptions.
+  electricityPricePerKwh: 0.2611,
 } as const;
 
 // Plug-in hybrids report the WLTP *weighted* combined figure (battery assumed charged), which
@@ -50,21 +54,35 @@ export function deriveAnnualFuelCost(
   return gallons * RUNNING_COST_ASSUMPTIONS.litresPerGallon * pricePerLitre;
 }
 
-// Cheapest variant's (first-year VED + annual fuel estimate). Needs BOTH components — a car
-// missing either is "no data", not "cheap".
+// Annual electricity cost for a pure EV: miles ÷ (mi/kWh) × £/kWh at the documented capped rate.
+// Electric-only — PHEVs never take this path: their real cost is an unknowable mix of the
+// weighted-test MPG (excluded above) and electric running, so any single figure would be
+// fabricated.
+export function deriveAnnualEnergyCost(milesPerKwh: number | null, fuelType: string | null): number | null {
+  if (milesPerKwh === null || milesPerKwh <= 0) return null;
+  if (fuelType?.toLowerCase() !== "electric") return null;
+  return (RUNNING_COST_ASSUMPTIONS.annualMiles / milesPerKwh) * RUNNING_COST_ASSUMPTIONS.electricityPricePerKwh;
+}
+
+// Cheapest variant's (first-year VED + annual fuel OR electricity estimate). Needs BOTH
+// components — a car missing either is "no data", not "cheap". EVs and combustion cars compete
+// in the same £/yr terms.
 export function deriveRunningCost(
   variants: Array<{
     mpgCombined: number | null;
     fuelType: string | null;
     powertrain: string | null;
     vedAnnualGbp: number | null;
+    milesPerKwh: number | null;
   }>
 ): number | null {
   let best: number | null = null;
   for (const v of variants) {
-    const fuel = deriveAnnualFuelCost(v.mpgCombined, v.fuelType, v.powertrain);
-    if (fuel === null || v.vedAnnualGbp === null) continue;
-    const total = v.vedAnnualGbp + fuel;
+    const energy =
+      deriveAnnualFuelCost(v.mpgCombined, v.fuelType, v.powertrain) ??
+      deriveAnnualEnergyCost(v.milesPerKwh, v.fuelType);
+    if (energy === null || v.vedAnnualGbp === null) continue;
+    const total = v.vedAnnualGbp + energy;
     if (best === null || total < best) best = total;
   }
   return best;
@@ -106,6 +124,7 @@ export async function fetchScoringInputs(): Promise<ScoringInput[]> {
             fuelType: true,
             powertrain: true,
             vedAnnualGbp: true,
+            milesPerKwh: true,
             dataFetchedAt: true,
           },
         },
@@ -126,6 +145,7 @@ export async function fetchScoringInputs(): Promise<ScoringInput[]> {
       fuelType: v.fuelType,
       powertrain: v.powertrain,
       vedAnnualGbp: v.vedAnnualGbp,
+      milesPerKwh: v.milesPerKwh === null ? null : Number(v.milesPerKwh),
     }));
     const rel = m.motReliability.map((r) => ({
       defectsPer100: r.defectsPer100 === null ? null : Number(r.defectsPer100),

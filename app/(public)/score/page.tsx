@@ -62,10 +62,11 @@ export default async function ScorePage({
           <p className="mt-4 text-xs text-gray-500">
             Running cost assumes {RUNNING_COST_ASSUMPTIONS.annualMiles.toLocaleString()} miles/year at £
             {RUNNING_COST_ASSUMPTIONS.petrolPricePerLitre.toFixed(2)}/L petrol · £
-            {RUNNING_COST_ASSUMPTIONS.dieselPricePerLitre.toFixed(2)}/L diesel, plus first-year VED. EVs are
-            not scored on running cost (no electricity-cost data), and plug-in hybrids&apos; weighted-test MPG
-            (a different WLTP regime producing 150+ &quot;mpg&quot;) is excluded from economy and running-cost
-            scoring as not comparable. Recall history currently has no data for any model — the DVSA recalls
+            {RUNNING_COST_ASSUMPTIONS.dieselPricePerLitre.toFixed(2)}/L diesel · {""}
+            {Math.round(RUNNING_COST_ASSUMPTIONS.electricityPricePerKwh * 100)}p/kWh home charging (Ofgem
+            price cap), plus first-year VED. Plug-in hybrids are excluded from economy and running-cost
+            scoring — their weighted-test MPG is a different WLTP regime and no single honest figure covers
+            their petrol/electric mix. Recall history currently has no data for any model — the DVSA recalls
             feed is pending.
           </p>
         </aside>

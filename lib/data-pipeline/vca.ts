@@ -20,6 +20,8 @@ export type VcaVariant = {
   mpgExtraUrban: number | null;
   mpgCombined: number | null;
   co2Gkm: number | null;
+  milesPerKwh: number | null; // EV/PHEV efficiency (WLTP)
+  maxRangeMiles: number | null; // EV/PHEV electric range (WLTP)
 };
 
 // Manufacturer strings come in ALL CAPS or with legal suffixes ("MG MOTORS UK", "Chery UK Ltd").
@@ -154,6 +156,9 @@ export function parseVcaCsv(path: string): VcaVariant[] {
       mpgExtraUrban: posFloat(r["WLTP Imperial Extra High"]),
       mpgCombined: posFloat(r["WLTP Imperial Combined"]) ?? posFloat(r["WLTP Imperial Combined (Weighted)"]),
       co2Gkm,
+      // VCA uses 0 for "not reported" here too — posFloat/posInt already treat 0 as null.
+      milesPerKwh: posFloat(r["Electric energy consumption Miles/kWh"]),
+      maxRangeMiles: posInt(r["Maximum range (Miles)"]),
     };
 
     // Case-insensitive: model/trim spellings that differ only in case ("Zoe" vs "ZOE") map to the
