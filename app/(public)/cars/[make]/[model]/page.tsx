@@ -88,6 +88,8 @@ export default async function ModelPage({
             mpgExtraUrban: v.mpgExtraUrban?.toString() ?? null,
             mpgCombined: v.mpgCombined?.toString() ?? null,
             co2Gkm: v.co2Gkm,
+            milesPerKwh: v.milesPerKwh?.toString() ?? null,
+            maxRangeMiles: v.maxRangeMiles,
             vedAnnualGbp: v.vedAnnualGbp,
             dataSource: v.dataSource,
             dataFetchedAt: v.dataFetchedAt,

@@ -21,6 +21,8 @@ function variant(overrides: Partial<PickerVariant>): PickerVariant {
     mpgExtraUrban: null,
     mpgCombined: "47.9",
     co2Gkm: 133,
+    milesPerKwh: null,
+    maxRangeMiles: null,
     vedAnnualGbp: 180,
     dataSource: "VCA",
     dataFetchedAt: new Date("2026-06-29"),
