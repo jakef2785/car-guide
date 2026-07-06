@@ -117,10 +117,14 @@ export function parseVcaCsv(path: string): VcaVariant[] {
   // difference is the WLTP figures — a buyer picks a trim, not a test config, so those rows would
   // render as indistinguishable duplicates. Per identity we keep ONE whole source row (figures are
   // never mixed across rows): the row with the most economy fields, then the best combined MPG
-  // (the manufacturer-headline configuration), then the lowest CO2, else first occurrence.
+  // (the manufacturer-headline configuration), then the lowest CO2, then — the EV equivalents,
+  // where all the MPG/CO2 fields tie — the best mi/kWh and longest range, else first occurrence.
+  // Without the EV tie-breaks, same-identity EV rows were kept by raw CSV order: ~220 EVs'
+  // efficiency/range (and running-cost scores downstream) silently depended on row order and
+  // could change on a re-download.
   const byIdentity = new Map<string, VcaVariant>();
 
-  const econFields = ["mpgUrban", "mpgExtraUrban", "mpgCombined", "co2Gkm"] as const;
+  const econFields = ["mpgUrban", "mpgExtraUrban", "mpgCombined", "co2Gkm", "milesPerKwh", "maxRangeMiles"] as const;
   const econCount = (v: VcaVariant) => econFields.filter((f) => v[f] !== null).length;
   const beats = (a: VcaVariant, b: VcaVariant): boolean => {
     if (econCount(a) !== econCount(b)) return econCount(a) > econCount(b);
@@ -129,7 +133,13 @@ export function parseVcaCsv(path: string): VcaVariant[] {
     if (mpgA !== mpgB) return mpgA > mpgB;
     const co2A = a.co2Gkm ?? Number.POSITIVE_INFINITY;
     const co2B = b.co2Gkm ?? Number.POSITIVE_INFINITY;
-    return co2A < co2B;
+    if (co2A !== co2B) return co2A < co2B;
+    const effA = a.milesPerKwh ?? -1;
+    const effB = b.milesPerKwh ?? -1;
+    if (effA !== effB) return effA > effB;
+    const rangeA = a.maxRangeMiles ?? -1;
+    const rangeB = b.maxRangeMiles ?? -1;
+    return rangeA > rangeB;
   };
 
   for (const r of records) {

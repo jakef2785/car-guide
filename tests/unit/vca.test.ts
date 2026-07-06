@@ -120,6 +120,33 @@ describe("parseVcaCsv identity collapse", () => {
 });
 
 describe("parseVcaCsv EV efficiency + range", () => {
+  it("keeps the best-efficiency row for same-identity EV rows regardless of CSV order", () => {
+    // Real case: Abarth 500e '114kW Electric' appears at 3.6 mi/kWh (164 mi) and 3.3 (152 mi).
+    // All MPG/CO2 fields tie for EVs, so without an EV-aware tie-break the winner was whichever
+    // row came first in the download — nondeterministic across re-downloads.
+    const rows = [
+      "ABARTH,500e,114kW Electric,A1,Automatic,0,Electricity,114,,,,,0,3.3,152",
+      "ABARTH,500e,114kW Electric,A1,Automatic,0,Electricity,114,,,,,0,3.6,164",
+    ];
+    for (const ordering of [rows, [...rows].reverse()]) {
+      const out = parseVcaCsv(csvFile(ordering));
+      expect(out).toHaveLength(1);
+      expect(out[0]).toMatchObject({ milesPerKwh: 3.6, maxRangeMiles: 164 });
+    }
+  });
+
+  it("prefers an EV row that has efficiency data over a same-identity row without it", () => {
+    const rows = [
+      "TESLA,Model 3,RWD,A1,Automatic,0,Electricity,283,,,,,0,0,0",
+      "TESLA,Model 3,RWD,A1,Automatic,0,Electricity,283,,,,,0,4.4,391",
+    ];
+    for (const ordering of [rows, [...rows].reverse()]) {
+      const out = parseVcaCsv(csvFile(ordering));
+      expect(out).toHaveLength(1);
+      expect(out[0]).toMatchObject({ milesPerKwh: 4.4, maxRangeMiles: 391 });
+    }
+  });
+
   it("parses Miles/kWh and max range for an EV row", () => {
     const file = csvFile([
       "TESLA,Model 3,Long Range AWD,A1,Automatic,0,Electricity,,,,,,0,4.1,340",

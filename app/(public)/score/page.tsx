@@ -63,7 +63,7 @@ export default async function ScorePage({
             Running cost assumes {RUNNING_COST_ASSUMPTIONS.annualMiles.toLocaleString()} miles/year at £
             {RUNNING_COST_ASSUMPTIONS.petrolPricePerLitre.toFixed(2)}/L petrol · £
             {RUNNING_COST_ASSUMPTIONS.dieselPricePerLitre.toFixed(2)}/L diesel · {""}
-            {Math.round(RUNNING_COST_ASSUMPTIONS.electricityPricePerKwh * 100)}p/kWh home charging (Ofgem
+            {(RUNNING_COST_ASSUMPTIONS.electricityPricePerKwh * 100).toFixed(2)}p/kWh home charging (Ofgem
             price cap), plus first-year VED. Plug-in hybrids are excluded from economy and running-cost
             scoring — their weighted-test MPG is a different WLTP regime and no single honest figure covers
             their petrol/electric mix. Recall history currently has no data for any model — the DVSA recalls
