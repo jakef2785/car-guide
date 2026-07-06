@@ -54,6 +54,9 @@ model Variant {
   trimName      String?  @map("trim_name")
   engineSizeCc  Int?     @map("engine_size_cc")
   fuelType      String?  @map("fuel_type")
+  // Raw VCA powertrain string ("Plug-in Hybrid Electric Vehicle (PHEV)", "Hybrid Electric
+  // Vehicle (HEV)", …) — needed to tell WLTP test regimes apart (PHEV MPG is "weighted").
+  powertrain    String?
   transmission  String?
   horsepower    Int?
   torqueNm      Int?     @map("torque_nm")

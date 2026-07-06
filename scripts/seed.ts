@@ -23,6 +23,7 @@ import path from "path";
 import { PrismaClient } from "@prisma/client";
 import { parseVcaCsv, cleanModel, type VcaVariant } from "../lib/data-pipeline/vca";
 import { calculateFirstYearVed } from "../lib/data-pipeline/ved";
+import { planEnrichmentMoves } from "../lib/data-pipeline/enrichment-migration";
 
 const prisma = new PrismaClient();
 
@@ -90,57 +91,76 @@ async function main() {
   // cleaned name changed (renamed/merged, e.g. "HR-V 2023" -> "HR-V") or VCA dropped it. For a
   // rename we re-point its MOT reliability / recalls at the successor — unless the successor
   // already has that data (three "HR-V <year>" donors carry the same motsearch nameplate data;
-  // the richest donor wins, the rest are near-duplicates and die with their stale model). ---
+  // the richest donor wins, the rest are near-duplicates and die with their stale model).
+  // Reliability and recalls are migrated as two INDEPENDENT passes (planEnrichmentMoves per
+  // criterion) — sharing one donor ranking would let a model win the recalls migration purely
+  // because it had more reliability rows, silently losing a larger recall set to a rival donor
+  // with fewer reliability rows but more recalls. See tests/unit/enrichment-migration.test.ts. ---
   const staleModels = existingModels.filter((m) => !modelBySlug.has(m.slug));
 
-  const relCounts = new Map<string, number>();
-  for (const g of await prisma.motReliability.groupBy({ by: ["modelId"], _count: { _all: true } })) {
-    if (g.modelId) relCounts.set(g.modelId, g._count._all);
-  }
-  const recallCounts = new Map<string, number>();
-  for (const g of await prisma.recall.groupBy({ by: ["modelId"], _count: { _all: true } })) {
-    if (g.modelId) recallCounts.set(g.modelId, g._count._all);
+  const targetFor = (stale: { name: string; makeId: string | null }): string | null => {
+    const makeName = stale.makeId ? makeNameById.get(stale.makeId) : null;
+    if (!makeName) return null;
+    const targetSlug = slugify(`${makeName}-${cleanModel(stale.name)}`);
+    return modelBySlug.has(targetSlug) ? modelIdBySlug.get(targetSlug) ?? null : null;
+  };
+
+  async function migrateCriterion(
+    label: string,
+    countsByModelId: () => Promise<Map<string, number>>,
+    alreadyFilled: () => Promise<Set<string>>,
+    applyMove: (staleId: string, targetId: string) => Promise<number>
+  ): Promise<number> {
+    const counts = await countsByModelId();
+    const donors = staleModels.map((m) => ({
+      staleId: m.id,
+      targetId: targetFor(m),
+      count: counts.get(m.id) ?? 0,
+    }));
+    const moves = planEnrichmentMoves(donors, await alreadyFilled());
+    let moved = 0;
+    for (const { staleId, targetId } of moves) {
+      const count = await applyMove(staleId, targetId);
+      moved += count;
+      const stale = staleModels.find((m) => m.id === staleId)!;
+      console.log(`  ${label}: "${stale.name}" -> target model (${count} rows)`);
+    }
+    return moved;
   }
 
-  let movedRel = 0;
-  let movedRecalls = 0;
-  const donors = staleModels
-    .filter((m) => (relCounts.get(m.id) ?? 0) + (recallCounts.get(m.id) ?? 0) > 0)
-    .sort((a, b) => (relCounts.get(b.id) ?? 0) - (relCounts.get(a.id) ?? 0));
-  const relFilled = new Set(
-    (await prisma.motReliability.findMany({ distinct: ["modelId"], select: { modelId: true } }))
-      .map((r) => r.modelId)
-      .filter((id): id is string => id !== null)
-  );
-  const recallFilled = new Set(
-    (await prisma.recall.findMany({ distinct: ["modelId"], select: { modelId: true } }))
-      .map((r) => r.modelId)
-      .filter((id): id is string => id !== null)
-  );
-  for (const stale of donors) {
-    const makeName = stale.makeId ? makeNameById.get(stale.makeId) : null;
-    if (!makeName) continue;
-    const targetSlug = slugify(`${makeName}-${cleanModel(stale.name)}`);
-    const targetId = modelBySlug.has(targetSlug) ? modelIdBySlug.get(targetSlug) : undefined;
-    if (!targetId || targetId === stale.id) continue;
-    if ((relCounts.get(stale.id) ?? 0) > 0 && !relFilled.has(targetId)) {
-      const res = await prisma.motReliability.updateMany({
-        where: { modelId: stale.id },
-        data: { modelId: targetId },
-      });
-      movedRel += res.count;
-      relFilled.add(targetId);
-      console.log(`  reliability: "${stale.name}" -> "${targetSlug}" (${res.count} rows)`);
+  const distinctModelIds = async (
+    findMany: (args: { distinct: ["modelId"]; select: { modelId: true } }) => Promise<{ modelId: string | null }[]>
+  ): Promise<Set<string>> =>
+    new Set(
+      (await findMany({ distinct: ["modelId"], select: { modelId: true } }))
+        .map((r) => r.modelId)
+        .filter((id): id is string => id !== null)
+    );
+
+  const movedRel = await migrateCriterion(
+    "reliability",
+    async () => {
+      const groups = await prisma.motReliability.groupBy({ by: ["modelId"], _count: { _all: true } });
+      return new Map(groups.filter((g) => g.modelId).map((g) => [g.modelId as string, g._count._all]));
+    },
+    () => distinctModelIds(prisma.motReliability.findMany.bind(prisma.motReliability)),
+    async (staleId, targetId) => {
+      const res = await prisma.motReliability.updateMany({ where: { modelId: staleId }, data: { modelId: targetId } });
+      return res.count;
     }
-    if ((recallCounts.get(stale.id) ?? 0) > 0 && !recallFilled.has(targetId)) {
-      const res = await prisma.recall.updateMany({
-        where: { modelId: stale.id },
-        data: { modelId: targetId },
-      });
-      movedRecalls += res.count;
-      recallFilled.add(targetId);
+  );
+  const movedRecalls = await migrateCriterion(
+    "recalls",
+    async () => {
+      const groups = await prisma.recall.groupBy({ by: ["modelId"], _count: { _all: true } });
+      return new Map(groups.filter((g) => g.modelId).map((g) => [g.modelId as string, g._count._all]));
+    },
+    () => distinctModelIds(prisma.recall.findMany.bind(prisma.recall)),
+    async (staleId, targetId) => {
+      const res = await prisma.recall.updateMany({ where: { modelId: staleId }, data: { modelId: targetId } });
+      return res.count;
     }
-  }
+  );
 
   // --- Prune models VCA no longer lists (their remaining rows cascade), then empty makes. ---
   if (staleModels.length > 0) {
@@ -166,6 +186,7 @@ async function main() {
         trimName: r.trim,
         engineSizeCc: r.engineSizeCc,
         fuelType: r.fuelType,
+        powertrain: r.powertrain,
         transmission: r.transmission,
         horsepower: r.horsepower,
         mpgUrban: r.mpgUrban,
