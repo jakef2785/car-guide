@@ -72,6 +72,10 @@ model Variant {
   mpgCombined   Decimal? @map("mpg_combined") @db.Decimal(5, 1)
   co2Gkm        Int?     @map("co2_gkm")
 
+  // Electric efficiency + range (VCA WLTP), EV/PHEV rows only
+  milesPerKwh   Decimal? @map("miles_per_kwh") @db.Decimal(5, 2)
+  maxRangeMiles Int?     @map("max_range_miles")
+
   // Road tax computed from co2Gkm using GOV.UK bands
   vedAnnualGbp  Int?     @map("ved_annual_gbp")
 

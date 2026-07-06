@@ -45,18 +45,38 @@ describe("deriveAnnualFuelCost", () => {
 describe("deriveRunningCost", () => {
   it("takes the cheapest variant with BOTH fuel and VED data", () => {
     const cost = deriveRunningCost([
-      { mpgCombined: 40, fuelType: "Petrol", powertrain: ICE, vedAnnualGbp: 200 }, // fuel ~968 + 200
-      { mpgCombined: 60, fuelType: "Petrol", powertrain: ICE, vedAnnualGbp: 180 }, // fuel ~645 + 180 <- cheapest
-      { mpgCombined: 70, fuelType: "Petrol", powertrain: ICE, vedAnnualGbp: null }, // incomplete -> skipped
+      { mpgCombined: 40, fuelType: "Petrol", powertrain: ICE, vedAnnualGbp: 200, milesPerKwh: null }, // fuel ~968 + 200
+      { mpgCombined: 60, fuelType: "Petrol", powertrain: ICE, vedAnnualGbp: 180, milesPerKwh: null }, // fuel ~645 + 180 <- cheapest
+      { mpgCombined: 70, fuelType: "Petrol", powertrain: ICE, vedAnnualGbp: null, milesPerKwh: null }, // incomplete -> skipped
     ])!;
     expect(cost).toBeCloseTo((7500 / 60) * 4.54609 * 1.42 + 180, 0);
   });
-  it("returns null when no variant has complete comparable data (EV-only or PHEV-only models)", () => {
+  it("scores an EV via electricity cost: miles ÷ mi/kWh × £/kWh + VED", () => {
+    const cost = deriveRunningCost([
+      { mpgCombined: null, fuelType: "Electric", powertrain: null, vedAnnualGbp: 10, milesPerKwh: 4.0 },
+    ])!;
+    expect(cost).toBeCloseTo((7500 / 4.0) * RUNNING_COST_ASSUMPTIONS.electricityPricePerKwh + 10, 0);
+  });
+  it("picks the cheapest across mixed EV and petrol variants of one model", () => {
+    // EV at 4 mi/kWh ≈ £490 energy + £10 VED — cheaper than the petrol at 60mpg (~£645 + £180).
+    const cost = deriveRunningCost([
+      { mpgCombined: 60, fuelType: "Petrol", powertrain: ICE, vedAnnualGbp: 180, milesPerKwh: null },
+      { mpgCombined: null, fuelType: "Electric", powertrain: null, vedAnnualGbp: 10, milesPerKwh: 4.0 },
+    ])!;
+    expect(cost).toBeCloseTo((7500 / 4.0) * RUNNING_COST_ASSUMPTIONS.electricityPricePerKwh + 10, 0);
+  });
+  it("returns null when data is incomplete — and never gives a PHEV either path", () => {
+    // EV missing efficiency or VED -> null
     expect(
-      deriveRunningCost([{ mpgCombined: null, fuelType: "Electric", powertrain: null, vedAnnualGbp: 10 }])
+      deriveRunningCost([{ mpgCombined: null, fuelType: "Electric", powertrain: null, vedAnnualGbp: 10, milesPerKwh: null }])
     ).toBeNull();
     expect(
-      deriveRunningCost([{ mpgCombined: 313.9, fuelType: "Hybrid", powertrain: PHEV, vedAnnualGbp: 110 }])
+      deriveRunningCost([{ mpgCombined: null, fuelType: "Electric", powertrain: null, vedAnnualGbp: null, milesPerKwh: 4.0 }])
+    ).toBeNull();
+    // PHEV: weighted MPG is not comparable AND its electric figure alone doesn't cover its
+    // real usage mix — excluded from both paths even when it carries milesPerKwh.
+    expect(
+      deriveRunningCost([{ mpgCombined: 313.9, fuelType: "Hybrid", powertrain: PHEV, vedAnnualGbp: 110, milesPerKwh: 3.2 }])
     ).toBeNull();
   });
 });
