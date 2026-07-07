@@ -104,6 +104,7 @@ describe("parseWeights", () => {
       runningCost: 50,
       reliability: 50,
       recalls: 50,
+      communityReliability: 50,
     });
   });
   it("keeps explicit zeros, clamps junk to the default, rounds decimals", () => {

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { AuthMenu } from "@/components/auth/AuthMenu";
 
 export function SiteHeader() {
   return (
@@ -7,10 +8,11 @@ export function SiteHeader() {
         <Link href="/" className="text-xl font-bold text-white">
           CarGuide
         </Link>
-        <nav className="flex gap-7 text-sm font-medium text-slate-300">
+        <nav className="flex items-center gap-7 text-sm font-medium text-slate-300">
           <Link href="/cars" className="hover:text-white">Browse</Link>
           <Link href="/cars" className="hover:text-white">Search</Link>
           <Link href="/score" className="hover:text-white">Score</Link>
+          <AuthMenu />
         </nav>
       </div>
     </header>

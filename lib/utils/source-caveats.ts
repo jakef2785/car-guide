@@ -10,7 +10,8 @@ export type SourceKey =
   | "DVSA"
   | "DVSA MOT"
   | "MOT (motsearch)"
-  | "VED-computed";
+  | "VED-computed"
+  | "Community";
 
 const CAVEATS: Record<SourceKey, string> = {
   CarVector: "US-centric catalogue.",
@@ -22,6 +23,8 @@ const CAVEATS: Record<SourceKey, string> = {
   "MOT (motsearch)":
     "UK MOT outcomes (DVSA data, OGL) via motsearch.co.uk — faults per 100 tests vs the same-year average. A reliability signal, not a manufacturer defect report.",
   "VED-computed": "Computed from CO2 via GOV.UK bands — confirm current rates at GOV.UK.",
+  Community:
+    "Owner-submitted opinion, moderated before publication — not verified data. Shown separately from sourced figures, and excluded from scoring until a model has 10+ reviews.",
 };
 
 export function caveatFor(source: string): string {

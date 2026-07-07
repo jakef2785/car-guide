@@ -207,8 +207,12 @@ model Review {
   body        String?
   knownIssues String?  @map("known_issues")
 
-  isApproved  Boolean  @default(false) @map("is_approved")
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz()
+  isApproved  Boolean   @default(false) @map("is_approved")
+  // Moderation audit trail (Phase 4) — written by admin approval server action only; DB column
+  // grants stop client roles from ever writing these (see 20260707120000 migration).
+  approvedAt  DateTime? @map("approved_at") @db.Timestamptz()
+  approvedBy  String?   @map("approved_by") @db.Uuid
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz()
 
   user  Profile? @relation(fields: [userId], references: [id], onDelete: Cascade)
   model Model?   @relation(fields: [modelId], references: [id], onDelete: Cascade)

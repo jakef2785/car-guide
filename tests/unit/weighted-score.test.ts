@@ -11,6 +11,7 @@ const W = (over: Partial<Weights> = {}): Weights => ({
   runningCost: 0,
   reliability: 0,
   recalls: 0,
+  communityReliability: 0,
   ...over,
 });
 
@@ -20,6 +21,7 @@ const V = (over: Partial<ModelCriterionValues> = {}): ModelCriterionValues => ({
   runningCost: null,
   reliability: null,
   recalls: null,
+  communityReliability: null,
   ...over,
 });
 
@@ -156,5 +158,32 @@ describe("scoreModels", () => {
     expect(a.criteria.performance.contribution).toBeCloseTo(60);
     expect(a.criteria.economy.contribution).toBeCloseTo(40);
     expect(a.finalScore).toBeCloseTo(100);
+  });
+});
+
+describe("communityReliability criterion (Phase 4)", () => {
+  it("treats a higher average owner rating as better", () => {
+    const out = scoreModels(
+      [
+        { id: "loved", values: V({ communityReliability: 4.6 }) },
+        { id: "mixed", values: V({ communityReliability: 3.0 }) },
+      ],
+      W({ communityReliability: 100 })
+    );
+    expect(out.map((m) => m.id)).toEqual(["loved", "mixed"]);
+    expect(out[0].finalScore).toBe(100);
+  });
+
+  it("marks models below the review threshold (null) as missing, not zero", () => {
+    const out = scoreModels(
+      [
+        { id: "rated", values: V({ performance: 200, communityReliability: 4 }) },
+        { id: "unrated", values: V({ performance: 300, communityReliability: null }) },
+      ],
+      W({ performance: 50, communityReliability: 50 })
+    );
+    const unrated = out.find((m) => m.id === "unrated")!;
+    expect(unrated.missing).toEqual(["communityReliability"]);
+    expect(unrated.finalScore).toBe(100); // scored purely on performance, not punished
   });
 });

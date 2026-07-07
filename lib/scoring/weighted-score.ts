@@ -6,6 +6,8 @@
 //   reliability  — MOT defects vs same-year average (ratio, mean across years), lower better
 //                  (replaces the US-era "complaint volume" criterion)
 //   recalls      — recall count, lower better ("No data available" until the DVSA file lands)
+//   communityReliability — average owner reliability rating (1–5), higher better; null until a
+//                  model has 10+ approved reviews (Scoring-System.md gate, lib/reviews/aggregate)
 //
 // final_score = Σ (criterion_score × user_weight) / Σ user_weights — but a model is never
 // punished for a data gap: criteria with no value are excluded from that model's numerator AND
@@ -17,7 +19,13 @@
 // (everyone equal) scores a neutral 50. Ties in the final score are broken by the MOT
 // reliability ratio ascending (the spec's tie-break, ported from complaint volume).
 
-export type CriterionKey = "performance" | "economy" | "runningCost" | "reliability" | "recalls";
+export type CriterionKey =
+  | "performance"
+  | "economy"
+  | "runningCost"
+  | "reliability"
+  | "recalls"
+  | "communityReliability";
 
 export const CRITERION_KEYS: CriterionKey[] = [
   "performance",
@@ -25,6 +33,7 @@ export const CRITERION_KEYS: CriterionKey[] = [
   "runningCost",
   "reliability",
   "recalls",
+  "communityReliability",
 ];
 
 // true = a bigger raw value is better; false = smaller is better.
@@ -34,6 +43,7 @@ const HIGHER_IS_BETTER: Record<CriterionKey, boolean> = {
   runningCost: false,
   reliability: false,
   recalls: false,
+  communityReliability: true,
 };
 
 export type ModelCriterionValues = Record<CriterionKey, number | null>;

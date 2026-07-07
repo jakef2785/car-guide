@@ -33,6 +33,7 @@ export const CRITERION_LABELS: Record<CriterionKey, string> = {
   runningCost: "Running cost",
   reliability: "MOT reliability",
   recalls: "Recall history",
+  communityReliability: "Owner-rated reliability",
 };
 
 export const CRITERION_SOURCES: Record<CriterionKey, string> = {
@@ -41,4 +42,5 @@ export const CRITERION_SOURCES: Record<CriterionKey, string> = {
   runningCost: "VCA MPG / mi-per-kWh + GOV.UK VED bands + stated assumptions",
   reliability: "UK MOT results (DVSA data via motsearch)",
   recalls: "DVSA recalls",
+  communityReliability: "Community reviews — counts only once a model has 10+ approved reviews",
 };

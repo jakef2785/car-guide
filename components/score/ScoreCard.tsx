@@ -17,6 +17,8 @@ function fmtRaw(key: CriterionKey, raw: number): string {
       return `${Math.round(raw * 100)}% of year avg`;
     case "recalls":
       return `${Math.round(raw)} recall${raw === 1 ? "" : "s"}`;
+    case "communityReliability":
+      return `${raw.toFixed(1)}/5 owner rating`;
   }
 }
 

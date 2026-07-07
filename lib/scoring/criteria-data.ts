@@ -2,6 +2,7 @@
 // exported for unit tests; only fetchScoringInputs touches the DB.
 import { prisma } from "@/lib/prisma";
 import type { ModelCriterionValues } from "@/lib/scoring/weighted-score";
+import { communityReliabilityForScoring } from "@/lib/reviews/aggregate";
 
 // --- Running-cost assumptions (documented on the page; approximate UK figures, mid-2026). ---
 // Fuel price per litre by normalised fuel type; hybrids buy petrol. EVs are excluded from the
@@ -110,7 +111,7 @@ export type ScoringInput = {
 };
 
 export async function fetchScoringInputs(): Promise<ScoringInput[]> {
-  const [models, anyRecalls] = await Promise.all([
+  const [models, anyRecalls, approvedRatings] = await Promise.all([
     prisma.model.findMany({
       select: {
         id: true,
@@ -136,7 +137,21 @@ export async function fetchScoringInputs(): Promise<ScoringInput[]> {
     // While the recalls table is empty the DVSA file simply hasn't been obtained — a 0 count is
     // "no data", not "zero recalls". Once any recalls exist, counts are real (including real 0s).
     prisma.recall.count().then((n) => n > 0),
+    // Approved owner reliability ratings, grouped per model in JS so the 10+-review release
+    // gate lives in ONE tested place (lib/reviews/aggregate.ts), not duplicated in SQL.
+    prisma.review.findMany({
+      where: { isApproved: true, reliabilityRating: { not: null } },
+      select: { modelId: true, reliabilityRating: true },
+    }),
   ]);
+
+  const ratingsByModel = new Map<string, { reliabilityRating: number | null; runningCostRating: number | null }[]>();
+  for (const r of approvedRatings) {
+    if (!r.modelId) continue;
+    const arr = ratingsByModel.get(r.modelId) ?? [];
+    arr.push({ reliabilityRating: r.reliabilityRating, runningCostRating: null });
+    ratingsByModel.set(r.modelId, arr);
+  }
 
   return models.map((m) => {
     const variants = m.variants.map((v) => ({
@@ -170,6 +185,7 @@ export async function fetchScoringInputs(): Promise<ScoringInput[]> {
         runningCost: deriveRunningCost(variants),
         reliability: deriveReliabilityRatio(rel),
         recalls: anyRecalls ? m._count.recalls : null,
+        communityReliability: communityReliabilityForScoring(ratingsByModel.get(m.id) ?? []),
       },
     };
   });

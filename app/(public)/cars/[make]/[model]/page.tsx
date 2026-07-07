@@ -8,6 +8,8 @@ import { prisma } from "@/lib/prisma";
 import { VariantPicker } from "@/components/cars/VariantPicker";
 import { RecallList } from "@/components/cars/RecallList";
 import { ReliabilityCard } from "@/components/cars/ReliabilityCard";
+import { CommunityReviews } from "@/components/reviews/CommunityReviews";
+import { listApprovedReviews, approvedReviewAggregate } from "@/lib/reviews/queries";
 
 // Route params come from the URL, so they're external input — validated per the workflow's
 // "Zod validation on every external input" rule, even though they end up in a Prisma `where`
@@ -38,8 +40,10 @@ export async function generateMetadata({
 
 export default async function ModelPage({
   params,
+  searchParams,
 }: {
   params: { make: string; model: string };
+  searchParams: { reviewed?: string };
 }) {
   const parsed = paramsSchema.safeParse(params);
   if (!parsed.success) notFound();
@@ -58,6 +62,11 @@ export default async function ModelPage({
   });
 
   if (!model || !model.make) notFound();
+
+  const [reviews, reviewAggregate] = await Promise.all([
+    listApprovedReviews(model.id),
+    approvedReviewAggregate(model.id),
+  ]);
 
   return (
     <main className="mx-auto max-w-3xl px-4 py-8">
@@ -111,6 +120,16 @@ export default async function ModelPage({
             defectsPer100: r.defectsPer100?.toString() ?? null,
             yearAvgPer100: r.yearAvgPer100?.toString() ?? null,
           }))}
+        />
+      </section>
+
+      <section className="mt-8">
+        <h2 className="mb-3 text-xl font-semibold text-gray-900">Community reviews</h2>
+        <CommunityReviews
+          reviews={reviews}
+          aggregate={reviewAggregate}
+          writeHref={`/cars/${parsed.data.make}/${parsed.data.model}/review`}
+          justSubmitted={searchParams.reviewed === "1"}
         />
       </section>
     </main>
