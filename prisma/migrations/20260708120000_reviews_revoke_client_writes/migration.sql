@@ -1,0 +1,20 @@
+-- Phase 4 follow-up (2026-07-08): remove the client-role write grants that the first Phase 4
+-- migration (20260707120000) added to `reviews`.
+--
+-- Why this is a fix, not a downgrade:
+-- CarGuide writes reviews ONLY server-side, via Prisma inside the submit server action
+-- (app/(public)/cars/[make]/[model]/review/actions.ts), which enforces auth -> email-verified ->
+-- rate-limit -> Zod validation before inserting. The earlier migration's column-level
+-- INSERT/UPDATE grants to `authenticated` exposed a SECOND write path — Supabase PostgREST — that
+-- bypasses every one of those gates. An empirical probe (signed-in user, anon key, direct REST
+-- insert) confirmed the grant is live: the insert passed the permission check and failed only on a
+-- NOT NULL violation on `id`, because Prisma sets id/created_at defaults at the app layer rather
+-- than as Postgres DEFAULTs. That is security-by-accident: a later change adding DB-level defaults
+-- (a routine Supabase-ification step) would silently open the door to unvalidated, unthrottled
+-- inserts straight into the moderation queue.
+--
+-- Correct model: every table in this schema is reached only through Prisma server-side. Client
+-- roles get NO CRUD grants on `reviews`; the existing RLS policies stay as inert belt-and-braces.
+-- Revoking the table-level privilege also drops all column-level grants of the same type, so this
+-- one statement removes the entire accidental surface.
+REVOKE INSERT, UPDATE ON "reviews" FROM anon, authenticated;
