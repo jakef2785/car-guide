@@ -14,7 +14,13 @@ type Recall = {
 
 export function RecallList({ recalls }: { recalls: Recall[] }) {
   if (recalls.length === 0) {
-    return <p className="text-sm text-slate-500">No recalls on record for this model.</p>;
+    // "No data yet", never "no recalls" — an empty feed must not read as a clean safety record
+    // (no data ≠ zero). Matches the ReliabilityCard's honest empty-state wording.
+    return (
+      <p className="text-sm text-slate-500">
+        No recall data for this model yet — the DVSA recalls feed is pending.
+      </p>
+    );
   }
 
   return (
