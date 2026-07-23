@@ -143,7 +143,8 @@ async function main() {
         mpgUrban,
         mpgExtraUrban,
         co2Gkm,
-        vedAnnualGbp: ved.firstYearRateGbp,
+        vedFirstYearGbp: ved.firstYearRateGbp,
+        vedAssumptionApplied: ved.assumptionApplied,
       },
     });
 

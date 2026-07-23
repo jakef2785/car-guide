@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma";
 import type { ModelCriterionValues } from "@/lib/scoring/weighted-score";
 import { communityReliabilityForScoring } from "@/lib/reviews/aggregate";
+import { STANDARD_ANNUAL_RATE_GBP } from "@/lib/data-pipeline/ved";
 
 // --- Running-cost assumptions (documented on the page; approximate UK figures, mid-2026). ---
 // Fuel price per litre by normalised fuel type; hybrids buy petrol. EVs are excluded from the
@@ -65,15 +66,17 @@ export function deriveAnnualEnergyCost(milesPerKwh: number | null, fuelType: str
   return (RUNNING_COST_ASSUMPTIONS.annualMiles / milesPerKwh) * RUNNING_COST_ASSUMPTIONS.electricityPricePerKwh;
 }
 
-// Cheapest variant's (first-year VED + annual fuel OR electricity estimate). Needs BOTH
-// components — a car missing either is "no data", not "cheap". EVs and combustion cars compete
-// in the same £/yr terms.
+// Cheapest variant's annual estimate: flat standard-rate VED + annual fuel OR electricity. The
+// year-2+ VED is £200 for virtually every car, so it's a constant offset carrying no ranking
+// signal — fuel/energy is what actually differentiates annual cost. First-year (CO2-banded) VED
+// is a one-time purchase charge and deliberately stays OUT of this figure: summing it with
+// recurring fuel mixed units and over-penalised high-CO2 cars (it still shows on the detail page
+// as a purchase-time figure). EVs and combustion cars compete in the same £/yr terms.
 export function deriveRunningCost(
   variants: Array<{
     mpgCombined: number | null;
     fuelType: string | null;
     powertrain: string | null;
-    vedAnnualGbp: number | null;
     milesPerKwh: number | null;
   }>
 ): number | null {
@@ -82,8 +85,8 @@ export function deriveRunningCost(
     const energy =
       deriveAnnualFuelCost(v.mpgCombined, v.fuelType, v.powertrain) ??
       deriveAnnualEnergyCost(v.milesPerKwh, v.fuelType);
-    if (energy === null || v.vedAnnualGbp === null) continue;
-    const total = v.vedAnnualGbp + energy;
+    if (energy === null) continue;
+    const total = STANDARD_ANNUAL_RATE_GBP + energy;
     if (best === null || total < best) best = total;
   }
   return best;
@@ -124,7 +127,6 @@ export async function fetchScoringInputs(): Promise<ScoringInput[]> {
             mpgCombined: true,
             fuelType: true,
             powertrain: true,
-            vedAnnualGbp: true,
             milesPerKwh: true,
             dataFetchedAt: true,
           },
@@ -159,7 +161,6 @@ export async function fetchScoringInputs(): Promise<ScoringInput[]> {
       mpgCombined: v.mpgCombined === null ? null : Number(v.mpgCombined),
       fuelType: v.fuelType,
       powertrain: v.powertrain,
-      vedAnnualGbp: v.vedAnnualGbp,
       milesPerKwh: v.milesPerKwh === null ? null : Number(v.milesPerKwh),
     }));
     const rel = m.motReliability.map((r) => ({

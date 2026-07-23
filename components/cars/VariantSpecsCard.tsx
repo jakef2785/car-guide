@@ -21,7 +21,8 @@ type Variant = {
   co2Gkm: number | null;
   milesPerKwh: string | number | null;
   maxRangeMiles: number | null;
-  vedAnnualGbp: number | null;
+  vedFirstYearGbp: number | null;
+  vedAssumptionApplied: boolean;
   dataSource: string;
   dataFetchedAt: Date;
 };
@@ -85,13 +86,14 @@ export function VariantSpecsCard({ variant }: { variant: Variant }) {
         <Spec label="CO₂ emissions" value={variant.co2Gkm} unit=" g/km" />
         <Spec
           label="First-year VED"
-          value={variant.vedAnnualGbp !== null ? `£${variant.vedAnnualGbp}` : null}
+          value={variant.vedFirstYearGbp !== null ? `£${variant.vedFirstYearGbp}` : null}
         />
-        {variant.vedAnnualGbp !== null && (
+        {variant.vedFirstYearGbp !== null && (
           <p className="pt-1 text-xs text-slate-400">
-            {/* ved.ts defaults diesels to the higher non-RDE2 band when NOx compliance is unknown
-                (assumptionApplied) — surface that specifically rather than as an exact figure. */}
-            {variant.fuelType === "Diesel"
+            {/* ved.ts defaults diesels to the higher non-RDE2 band when NOx compliance is unknown;
+                that decision is persisted per-variant (vedAssumptionApplied) — caveat from the
+                data itself, not a guess off the fuel-type string. */}
+            {variant.vedAssumptionApplied
               ? "Assumes non-RDE2 diesel — the actual first-year rate may be lower; confirm at GOV.UK."
               : caveatFor("VED-computed")}
           </p>

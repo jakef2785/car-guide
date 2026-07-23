@@ -99,7 +99,8 @@ export default async function ModelPage({
             co2Gkm: v.co2Gkm,
             milesPerKwh: v.milesPerKwh?.toString() ?? null,
             maxRangeMiles: v.maxRangeMiles,
-            vedAnnualGbp: v.vedAnnualGbp,
+            vedFirstYearGbp: v.vedFirstYearGbp,
+            vedAssumptionApplied: v.vedAssumptionApplied,
             dataSource: v.dataSource,
             dataFetchedAt: v.dataFetchedAt,
           }))}

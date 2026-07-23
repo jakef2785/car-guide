@@ -64,7 +64,9 @@ export default async function ScorePage({
             {RUNNING_COST_ASSUMPTIONS.petrolPricePerLitre.toFixed(2)}/L petrol · £
             {RUNNING_COST_ASSUMPTIONS.dieselPricePerLitre.toFixed(2)}/L diesel · {""}
             {(RUNNING_COST_ASSUMPTIONS.electricityPricePerKwh * 100).toFixed(2)}p/kWh home charging (Ofgem
-            price cap), plus first-year VED. Plug-in hybrids are excluded from economy and running-cost
+            price cap), plus the flat £200 standard-rate VED (first-year CO2-banded VED is a one-time
+            purchase cost, shown on each car&apos;s page, and isn&apos;t counted as annual). Plug-in
+            hybrids are excluded from economy and running-cost
             scoring — their weighted-test MPG is a different WLTP regime and no single honest figure covers
             their petrol/electric mix. Recall history currently has no data for any model — the DVSA recalls
             feed is pending.

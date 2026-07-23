@@ -25,7 +25,8 @@ export type PickerVariant = {
   co2Gkm: number | null;
   milesPerKwh: string | number | null;
   maxRangeMiles: number | null;
-  vedAnnualGbp: number | null;
+  vedFirstYearGbp: number | null;
+  vedAssumptionApplied: boolean;
   dataSource: string;
   dataFetchedAt: Date;
 };

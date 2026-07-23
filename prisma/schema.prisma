@@ -76,8 +76,12 @@ model Variant {
   milesPerKwh   Decimal? @map("miles_per_kwh") @db.Decimal(5, 2)
   maxRangeMiles Int?     @map("max_range_miles")
 
-  // Road tax computed from co2Gkm using GOV.UK bands
-  vedAnnualGbp  Int?     @map("ved_annual_gbp")
+  // First-year (CO2-banded) road tax computed from co2Gkm using GOV.UK bands — a one-time
+  // purchase-year charge, NOT an annual figure (the year-2+ standard rate is a flat £200).
+  // vedAssumptionApplied: diesel was banded as non-RDE2 because NOx compliance is unknown;
+  // the UI shows a caveat when set.
+  vedFirstYearGbp      Int?    @map("ved_first_year_gbp")
+  vedAssumptionApplied Boolean @default(false) @map("ved_assumption_applied")
 
   // Metadata — source transparency, mandatory per Guiding Principles
   dataSource    String   @map("data_source")
