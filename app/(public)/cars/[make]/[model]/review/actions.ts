@@ -41,7 +41,12 @@ export async function submitReviewAction(
     // isApproved defaults false — every review goes through moderation.
   });
   if (!result.ok)
-    return { error: "You've posted several reviews recently — try again in an hour." };
+    return {
+      error:
+        result.reason === "rate_limited"
+          ? "You've posted several reviews recently — try again in an hour."
+          : "Something went wrong submitting your review — please try again.",
+    };
 
   redirect(`/cars/${model.make.slug}/${model.slug}?reviewed=1`);
 }

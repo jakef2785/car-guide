@@ -42,7 +42,7 @@ export async function insertReviewWithinRateLimit(
   userId: string,
   data: Prisma.ReviewUncheckedCreateInput,
   now: Date = new Date(),
-): Promise<{ ok: true } | { ok: false; reason: "rate_limited" }> {
+): Promise<{ ok: true } | { ok: false; reason: "rate_limited" | "contention" }> {
   const MAX_ATTEMPTS = 6;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
@@ -58,13 +58,16 @@ export async function insertReviewWithinRateLimit(
       );
     } catch (err) {
       // A serialization failure is the expected signal of a genuine race — retry with a fresh
-      // snapshot. Any other error is real and propagates.
-      if (isSerializationFailure(err) && attempt < MAX_ATTEMPTS) continue;
-      throw err;
+      // snapshot. Any other error is real and propagates. A failure on the final attempt falls
+      // out of the loop to the fail-closed return below (previously it rethrew, making that
+      // return unreachable and turning sustained contention into an unhandled server error).
+      if (!isSerializationFailure(err)) throw err;
     }
   }
   // Exhausted retries under sustained contention — fail closed (no insert is the safe direction).
-  return { ok: false as const, reason: "rate_limited" as const };
+  // Distinct reason from "rate_limited": the user may NOT actually be over the cap, so the caller
+  // must not tell them they posted too much — just to try again.
+  return { ok: false as const, reason: "contention" as const };
 }
 
 export type ApprovedReview = {
