@@ -65,7 +65,7 @@ export function CommunityReviews({
           <li key={r.id} className="rounded-md border border-slate-200 bg-white p-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h3 className="font-semibold text-gray-900">{r.title}</h3>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-slate-600">
                 {r.username ?? "CarGuide member"} · {r.createdAt.toISOString().slice(0, 10)}
               </span>
             </div>

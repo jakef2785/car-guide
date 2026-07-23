@@ -35,7 +35,7 @@ export function RecallList({ recalls }: { recalls: Recall[] }) {
             <SourceTag source={recall.dataSource} fetchedAt={new Date(recall.dataFetchedAt)} />
           </div>
           {recall.recallDate && (
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-600">
               {new Date(recall.recallDate).toISOString().slice(0, 10)}
             </p>
           )}

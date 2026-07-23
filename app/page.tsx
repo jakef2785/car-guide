@@ -17,7 +17,7 @@ export default async function Home() {
             <SearchPanel facets={facets} />
           </div>
         </div>
-        <div className="flex h-72 items-center justify-center rounded-xl border border-gray-200 bg-slate-100 text-slate-400 md:h-80">
+        <div className="flex h-72 items-center justify-center rounded-xl border border-gray-200 bg-slate-100 text-slate-600 md:h-80">
           No image
         </div>
       </section>

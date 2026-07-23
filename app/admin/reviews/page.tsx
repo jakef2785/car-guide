@@ -40,7 +40,7 @@ export default async function AdminReviewsPage() {
                 {r.model?.make?.name} {r.model?.name}
                 {r.variantYear && ` (${r.variantYear})`} — {r.title}
               </h2>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-slate-600">
                 {r.user?.username ?? r.user?.id ?? "unknown user"} ·{" "}
                 {r.createdAt.toISOString().slice(0, 10)}
               </span>

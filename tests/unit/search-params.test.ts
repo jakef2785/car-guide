@@ -114,3 +114,18 @@ describe("buildModelWhere", () => {
     });
   });
 });
+
+describe("parseCarSearchParams — page", () => {
+  it("accepts an integer page of 2 or more", () => {
+    expect(parseCarSearchParams({ page: "3" }).page).toBe(3);
+  });
+  it("treats page 1, non-integers and junk as absent (page 1)", () => {
+    expect(parseCarSearchParams({ page: "1" }).page).toBeUndefined();
+    expect(parseCarSearchParams({ page: "0" }).page).toBeUndefined();
+    expect(parseCarSearchParams({ page: "2.5" }).page).toBeUndefined();
+    expect(parseCarSearchParams({ page: "-4" }).page).toBeUndefined();
+    expect(parseCarSearchParams({ page: "banana" }).page).toBeUndefined();
+    expect(parseCarSearchParams({ page: "" }).page).toBeUndefined();
+    expect(parseCarSearchParams({}).page).toBeUndefined();
+  });
+});

@@ -26,6 +26,7 @@ export type CarSearchParams = {
   co2Max?: number; // g/km
   reliability?: "better"; // only models better than their year-average in at least one model year
   sort?: SortKey;
+  page?: number; // 1-based; parsed leniently, anything invalid means page 1
 };
 
 type RawParams = Record<string, string | string[] | undefined>;
@@ -66,6 +67,9 @@ export function parseCarSearchParams(raw: RawParams): CarSearchParams {
   if (first(raw.reliability) === "better") out.reliability = "better";
   const sort = first(raw.sort);
   if (sort && (SORT_KEYS as string[]).includes(sort)) out.sort = sort as SortKey;
+
+  const page = posNum.parse(first(raw.page));
+  if (page !== undefined && Number.isInteger(page) && page >= 2) out.page = page;
 
   return out;
 }

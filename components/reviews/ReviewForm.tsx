@@ -75,40 +75,40 @@ export function ReviewForm({ modelId }: { modelId: string }) {
       </label>
 
       <label className={labelClass}>
-        Known issues <span className="font-normal text-slate-400">(optional)</span>
+        Known issues <span className="font-normal text-slate-600">(optional)</span>
         <textarea name="knownIssues" maxLength={2000} rows={3} className={inputClass} />
       </label>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <label className={labelClass}>
-          Model year <span className="font-normal text-slate-400">(optional)</span>
+          Model year <span className="font-normal text-slate-600">(optional)</span>
           <input type="number" name="variantYear" min={1980} max={2100} className={inputClass} />
         </label>
         <label className={labelClass}>
-          Months owned <span className="font-normal text-slate-400">(optional)</span>
+          Months owned <span className="font-normal text-slate-600">(optional)</span>
           <input type="number" name="ownershipMonths" min={0} max={600} className={inputClass} />
         </label>
         <label className={labelClass}>
-          Annual mileage <span className="font-normal text-slate-400">(optional)</span>
+          Annual mileage <span className="font-normal text-slate-600">(optional)</span>
           <input type="number" name="annualMileage" min={0} max={200000} className={inputClass} />
         </label>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <label className={labelClass}>
-          Real-world MPG <span className="font-normal text-slate-400">(optional)</span>
+          Real-world MPG <span className="font-normal text-slate-600">(optional)</span>
           <input type="number" step="0.1" name="realWorldMpg" min={1} max={300} className={inputClass} />
         </label>
         <label className={labelClass}>
-          Fuel £/month <span className="font-normal text-slate-400">(optional)</span>
+          Fuel £/month <span className="font-normal text-slate-600">(optional)</span>
           <input type="number" step="0.01" name="monthlyFuelCostGbp" min={0} max={5000} className={inputClass} />
         </label>
         <label className={labelClass}>
-          Insurance £/month <span className="font-normal text-slate-400">(optional)</span>
+          Insurance £/month <span className="font-normal text-slate-600">(optional)</span>
           <input type="number" step="0.01" name="monthlyInsuranceGbp" min={0} max={5000} className={inputClass} />
         </label>
         <label className={labelClass}>
-          Servicing £/year <span className="font-normal text-slate-400">(optional)</span>
+          Servicing £/year <span className="font-normal text-slate-600">(optional)</span>
           <input type="number" step="0.01" name="annualServicingGbp" min={0} max={20000} className={inputClass} />
         </label>
       </div>

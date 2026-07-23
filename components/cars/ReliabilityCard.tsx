@@ -106,7 +106,7 @@ export function ReliabilityCard({ reliability }: { reliability: Reliability[] })
         {badge && <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badge.cls}`}>{badge.text}</span>}
       </div>
       {(row.testCount !== null || row.sampleCars !== null) && (
-        <p className="mt-1 text-xs text-slate-400">
+        <p className="mt-1 text-xs text-slate-600">
           {row.sampleCars !== null && `${row.sampleCars.toLocaleString("en-GB")} cars`}
           {row.sampleCars !== null && row.testCount !== null && " · "}
           {row.testCount !== null && `${row.testCount.toLocaleString("en-GB")} tests`}
@@ -123,7 +123,7 @@ export function ReliabilityCard({ reliability }: { reliability: Reliability[] })
           </ul>
         </div>
       ) : (
-        <p className="mt-3 text-xs text-slate-400">Per-fault detail for this year is still being collected.</p>
+        <p className="mt-3 text-xs text-slate-600">Per-fault detail for this year is still being collected.</p>
       )}
 
       {best && worst && best.year !== worst.year && (
@@ -134,7 +134,7 @@ export function ReliabilityCard({ reliability }: { reliability: Reliability[] })
         </p>
       )}
 
-      <p className="pt-3 text-xs text-slate-400">{caveatFor(row.dataSource)}</p>
+      <p className="pt-3 text-xs text-slate-600">{caveatFor(row.dataSource)}</p>
     </div>
   );
 }

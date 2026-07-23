@@ -21,6 +21,13 @@ export default async function ScorePage({
   const weights = parseWeights(searchParams);
   const inputs = await fetchScoringInputs();
 
+  // Criteria with no data for ANY model get their slider disabled + badged — a live-looking
+  // control that can't affect the ranking would mislead (recalls until the DVSA feed lands;
+  // owner ratings until a model crosses 10+ approved reviews).
+  const criterionHasData = Object.fromEntries(
+    CRITERION_KEYS.map((k) => [k, inputs.some((m) => m.values[k] !== null)])
+  ) as Record<(typeof CRITERION_KEYS)[number], boolean>;
+
   const scored = scoreModels(
     inputs.map((m) => ({ id: m.id, values: m.values })),
     weights
@@ -50,6 +57,7 @@ export default async function ScorePage({
                 label={CRITERION_LABELS[key]}
                 source={CRITERION_SOURCES[key]}
                 defaultValue={weights[key]}
+                noData={!criterionHasData[key]}
               />
             ))}
             <button

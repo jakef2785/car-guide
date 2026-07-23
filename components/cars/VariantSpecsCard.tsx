@@ -89,7 +89,7 @@ export function VariantSpecsCard({ variant }: { variant: Variant }) {
           value={variant.vedFirstYearGbp !== null ? `£${variant.vedFirstYearGbp}` : null}
         />
         {variant.vedFirstYearGbp !== null && (
-          <p className="pt-1 text-xs text-slate-400">
+          <p className="pt-1 text-xs text-slate-600">
             {/* ved.ts defaults diesels to the higher non-RDE2 band when NOx compliance is unknown;
                 that decision is persisted per-variant (vedAssumptionApplied) — caveat from the
                 data itself, not a guess off the fuel-type string. */}

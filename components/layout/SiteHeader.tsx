@@ -9,8 +9,9 @@ export function SiteHeader() {
           CarGuide
         </Link>
         <nav className="flex items-center gap-7 text-sm font-medium text-slate-300">
+          {/* One entry for /cars — "Browse" and "Search" both pointed there, which read as two
+              different destinations. The page itself covers both jobs (browse + filter). */}
           <Link href="/cars" className="hover:text-white">Browse</Link>
-          <Link href="/cars" className="hover:text-white">Search</Link>
           <Link href="/score" className="hover:text-white">Score</Link>
           <AuthMenu />
         </nav>

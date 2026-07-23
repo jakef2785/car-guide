@@ -6,18 +6,19 @@ import type { CarSearchParams, SortKey } from "@/lib/cars/search-params";
 import type { FilterFacets } from "@/lib/cars/queries";
 
 const SORTS: { value: SortKey; label: string }[] = [
-  { value: "make", label: "Make (A–Z)" },
   { value: "mpg", label: "Best MPG" },
   { value: "co2", label: "Lowest CO₂" },
   { value: "power", label: "Most power" },
 ];
 
+// A real <label> so screen readers announce the field name for the wrapped control (implicit
+// association — the first labelable descendant). Multi-input children carry their own aria-labels.
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
+    <label className="block">
       <span className="mb-1.5 block text-sm font-semibold text-gray-900">{label}</span>
       {children}
-    </div>
+    </label>
   );
 }
 
@@ -56,6 +57,7 @@ function NumRange({
   min,
   max,
   unit,
+  labelBase,
 }: {
   fromName: string;
   toName: string;
@@ -64,13 +66,14 @@ function NumRange({
   min: number;
   max: number;
   unit?: string;
+  labelBase: string; // e.g. "engine size" — the wrapping Field label only reaches the first input
 }) {
   const cls = "h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900";
   return (
     <div className="flex items-center gap-2">
-      <input type="number" name={fromName} defaultValue={from ?? ""} placeholder={`Min${unit ? " " + unit : ""} (${min})`} min={0} className={cls} />
-      <span className="text-gray-400">–</span>
-      <input type="number" name={toName} defaultValue={to ?? ""} placeholder={`Max (${max})`} min={0} className={cls} />
+      <input type="number" name={fromName} defaultValue={from ?? ""} placeholder={`Min${unit ? " " + unit : ""} (${min})`} min={0} aria-label={`Minimum ${labelBase}`} className={cls} />
+      <span aria-hidden="true" className="text-gray-600">–</span>
+      <input type="number" name={toName} defaultValue={to ?? ""} placeholder={`Max (${max})`} min={0} aria-label={`Maximum ${labelBase}`} className={cls} />
     </div>
   );
 }
@@ -104,10 +107,10 @@ export function FilterSidebar({ params, facets }: { params: CarSearchParams; fac
       )}
 
       <Field label="Engine size (cc)">
-        <NumRange fromName="engineFrom" toName="engineTo" from={params.engineFrom} to={params.engineTo} min={facets.engine.min} max={facets.engine.max} />
+        <NumRange fromName="engineFrom" toName="engineTo" from={params.engineFrom} to={params.engineTo} min={facets.engine.min} max={facets.engine.max} labelBase="engine size (cc)" />
       </Field>
       <Field label="Power (ps)">
-        <NumRange fromName="powerFrom" toName="powerTo" from={params.powerFrom} to={params.powerTo} min={facets.power.min} max={facets.power.max} />
+        <NumRange fromName="powerFrom" toName="powerTo" from={params.powerFrom} to={params.powerTo} min={facets.power.min} max={facets.power.max} labelBase="power (ps)" />
       </Field>
 
       <div className="grid grid-cols-2 gap-3">
@@ -130,7 +133,9 @@ export function FilterSidebar({ params, facets }: { params: CarSearchParams; fac
           defaultValue={params.sort ?? ""}
           className="h-11 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm text-gray-900"
         >
-          <option value="">Relevance</option>
+          {/* The default IS make-A–Z (the query's orderBy) — labelling it "Relevance" implied a
+              ranking that doesn't exist. "make" stays a valid SortKey for old URLs. */}
+          <option value="">Make (A–Z)</option>
           {SORTS.map((s) => (
             <option key={s.value} value={s.value}>
               {s.label}

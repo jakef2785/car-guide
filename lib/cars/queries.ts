@@ -78,7 +78,19 @@ async function betterThanAverageModelIds(): Promise<string[]> {
   return rows.map((r) => r.model_id);
 }
 
-export async function listModels(params: CarSearchParams): Promise<ModelCardModel[]> {
+// One results page of cards. Sorting is in-memory over the full (bounded, ~hundreds) result set —
+// the mpg/co2/power sorts derive per-model values Prisma can't order by — so pagination slices
+// AFTER the sort rather than using DB skip/take, which would paginate the wrong order.
+export const CARS_PAGE_SIZE = 24;
+
+export type ModelPage = {
+  cards: ModelCardModel[];
+  total: number;
+  page: number; // 1-based, clamped to the last non-empty page
+  pageCount: number;
+};
+
+export async function listModels(params: CarSearchParams): Promise<ModelPage> {
   const clauses: Prisma.ModelWhereInput[] = [buildModelWhere(params)];
   if (params.reliability === "better") {
     clauses.push({ id: { in: await betterThanAverageModelIds() } });
@@ -88,7 +100,13 @@ export async function listModels(params: CarSearchParams): Promise<ModelCardMode
     select: cardSelect,
     orderBy: [{ make: { name: "asc" } }, { name: "asc" }],
   });
-  return sortCards(models.map(toCardModel), params.sort);
+  const sorted = sortCards(models.map(toCardModel), params.sort);
+
+  const total = sorted.length;
+  const pageCount = Math.max(1, Math.ceil(total / CARS_PAGE_SIZE));
+  const page = Math.min(Math.max(params.page ?? 1, 1), pageCount);
+  const start = (page - 1) * CARS_PAGE_SIZE;
+  return { cards: sorted.slice(start, start + CARS_PAGE_SIZE), total, page, pageCount };
 }
 
 export type FilterFacets = {
