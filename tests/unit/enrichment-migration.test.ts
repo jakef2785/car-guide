@@ -1,4 +1,4 @@
-import { planEnrichmentMoves } from "@/lib/data-pipeline/enrichment-migration";
+import { planEnrichmentMoves, planReviewMoves } from "@/lib/data-pipeline/enrichment-migration";
 
 describe("planEnrichmentMoves", () => {
   it("picks the richest donor per target by THIS criterion's own count", () => {
@@ -80,5 +80,38 @@ describe("planEnrichmentMoves", () => {
       { staleId: "a", targetId: "t1" },
       { staleId: "b", targetId: "t2" },
     ]);
+  });
+});
+
+describe("planReviewMoves", () => {
+  it("moves ALL reviewed stale models to their targets — no richest-donor selection", () => {
+    // Both donors share one target; unlike enrichment, BOTH move (reviews merge additively —
+    // dropping the smaller donor would destroy unique user content).
+    const { moves, blockedStaleIds } = planReviewMoves([
+      { staleId: "a", targetId: "t1", reviewCount: 10 },
+      { staleId: "b", targetId: "t1", reviewCount: 3 },
+    ]);
+    expect(moves).toEqual([
+      { staleId: "a", targetId: "t1" },
+      { staleId: "b", targetId: "t1" },
+    ]);
+    expect(blockedStaleIds).toEqual([]);
+  });
+
+  it("blocks pruning a reviewed stale model with no successor instead of letting it cascade", () => {
+    const { moves, blockedStaleIds } = planReviewMoves([
+      { staleId: "dropped", targetId: null, reviewCount: 2 },
+    ]);
+    expect(moves).toEqual([]);
+    expect(blockedStaleIds).toEqual(["dropped"]);
+  });
+
+  it("ignores stale models with no reviews — nothing to protect, prune freely", () => {
+    const { moves, blockedStaleIds } = planReviewMoves([
+      { staleId: "empty-renamed", targetId: "t1", reviewCount: 0 },
+      { staleId: "empty-dropped", targetId: null, reviewCount: 0 },
+    ]);
+    expect(moves).toEqual([]);
+    expect(blockedStaleIds).toEqual([]);
   });
 });

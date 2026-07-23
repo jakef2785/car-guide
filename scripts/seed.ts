@@ -12,10 +12,13 @@
 //
 // SYNC, NOT WIPE: models are upserted by slug and only the variants (which this script wholly
 // owns) are rebuilt. Enrichment layered onto models by other scripts — MOT reliability
-// (scrape-motsearch.ts) and recalls (match-dvsa-recalls.ts) — survives a re-seed. When a model's
-// cleaned name changes (e.g. "HR-V 2023" -> "HR-V"), its enrichment is re-pointed at the renamed
-// model before the stale row is pruned. Pass --wipe for the old scorched-earth behaviour (drops
-// ALL models and their enrichment first — you will need to re-run the enrichment scripts).
+// (scrape-motsearch.ts) and recalls (match-dvsa-recalls.ts) — survives a re-seed, and so do
+// community reviews: ALL reviews on a renamed model follow it to the successor, and a dropped
+// model that still has reviews is retained rather than pruned (UGC never cascade-deletes
+// silently). When a model's cleaned name changes (e.g. "HR-V 2023" -> "HR-V"), its enrichment is
+// re-pointed at the renamed model before the stale row is pruned. Pass --wipe for the old
+// scorched-earth behaviour (drops ALL models, enrichment AND reviews first — you will need to
+// re-run the enrichment scripts).
 //
 // Run with: node --env-file=.env.local --import tsx scripts/seed.ts [--wipe]
 
@@ -23,7 +26,7 @@ import path from "path";
 import { PrismaClient } from "@prisma/client";
 import { parseVcaCsv, cleanModel, type VcaVariant } from "../lib/data-pipeline/vca";
 import { calculateFirstYearVed } from "../lib/data-pipeline/ved";
-import { planEnrichmentMoves } from "../lib/data-pipeline/enrichment-migration";
+import { planEnrichmentMoves, planReviewMoves } from "../lib/data-pipeline/enrichment-migration";
 
 const prisma = new PrismaClient();
 
@@ -162,14 +165,49 @@ async function main() {
     }
   );
 
-  // --- Prune models VCA no longer lists (their remaining rows cascade), then empty makes. ---
-  if (staleModels.length > 0) {
-    await prisma.model.deleteMany({ where: { id: { in: staleModels.map((m) => m.id) } } });
+  // --- Reviews are UGC, not enrichment: every row is unique and irreplaceable, so they don't go
+  // through planEnrichmentMoves (whose richest-donor-wins rule would silently drop the losers).
+  // ALL reviews on EVERY stale model move to its successor; a stale model that still has reviews
+  // but no successor is NOT pruned — cascade-deleting user content silently is the one
+  // unacceptable outcome (Review.model is onDelete: Cascade). ---
+  const reviewGroups = await prisma.review.groupBy({ by: ["modelId"], _count: { _all: true } });
+  const reviewCounts = new Map(
+    reviewGroups.filter((g) => g.modelId).map((g) => [g.modelId as string, g._count._all])
+  );
+  const reviewPlan = planReviewMoves(
+    staleModels.map((m) => ({
+      staleId: m.id,
+      targetId: targetFor(m),
+      reviewCount: reviewCounts.get(m.id) ?? 0,
+    }))
+  );
+  let movedReviews = 0;
+  for (const { staleId, targetId } of reviewPlan.moves) {
+    const res = await prisma.review.updateMany({ where: { modelId: staleId }, data: { modelId: targetId } });
+    movedReviews += res.count;
+    const stale = staleModels.find((m) => m.id === staleId)!;
+    console.log(`  reviews: "${stale.name}" -> target model (${res.count} rows)`);
+  }
+  const blocked = new Set(reviewPlan.blockedStaleIds);
+  for (const staleId of reviewPlan.blockedStaleIds) {
+    const stale = staleModels.find((m) => m.id === staleId)!;
+    console.warn(
+      `  WARNING: "${stale.name}" has ${reviewCounts.get(staleId)} review(s) and no successor — ` +
+        `model RETAINED, not pruned. Resolve manually (merge or delete the reviews first).`
+    );
+  }
+
+  // --- Prune models VCA no longer lists (their remaining rows cascade), then empty makes.
+  // Models kept alive by unmigratable reviews are excluded; their make survives via `none`. ---
+  const pruneIds = staleModels.map((m) => m.id).filter((id) => !blocked.has(id));
+  if (pruneIds.length > 0) {
+    await prisma.model.deleteMany({ where: { id: { in: pruneIds } } });
   }
   const prunedMakes = await prisma.make.deleteMany({ where: { models: { none: {} } } });
   console.log(
-    `Pruned ${staleModels.length} stale models, ${prunedMakes.count} empty makes; ` +
-      `migrated ${movedRel} reliability rows, ${movedRecalls} recalls.`
+    `Pruned ${pruneIds.length} stale models (${blocked.size} retained for reviews), ` +
+      `${prunedMakes.count} empty makes; migrated ${movedRel} reliability rows, ` +
+      `${movedRecalls} recalls, ${movedReviews} reviews.`
   );
 
   // --- Variants: wholly owned by this script — rebuilt from scratch every run. Missing -> null,
@@ -196,7 +234,10 @@ async function main() {
         milesPerKwh: r.milesPerKwh,
         maxRangeMiles: r.maxRangeMiles,
         // VED is meaningful only where we have CO2 (its input). EV co2=0 -> the £10 band.
-        vedAnnualGbp: r.co2Gkm !== null ? ved.firstYearRateGbp : null,
+        // assumptionApplied travels with the figure so the UI caveats non-RDE2 diesel banding
+        // from data rather than guessing off the fuel type.
+        vedFirstYearGbp: r.co2Gkm !== null ? ved.firstYearRateGbp : null,
+        vedAssumptionApplied: r.co2Gkm !== null && ved.assumptionApplied,
         dataSource: "VCA",
         dataFetchedAt: fetchedAt,
       },

@@ -15,6 +15,34 @@ export type EnrichmentDonor = {
 
 export type EnrichmentMove = { staleId: string; targetId: string };
 
+// Reviews are UGC, not enrichment — every row is unique and irreplaceable, so the rules are the
+// opposite of planEnrichmentMoves: EVERY stale model with reviews and a successor moves ALL of
+// them (no richest-donor selection, no already-filled skip — reviews merge additively), and a
+// stale model with reviews but NO successor is reported as blocked so the seed retains it
+// instead of cascade-deleting user content.
+export type ReviewDonor = {
+  staleId: string;
+  targetId: string | null;
+  reviewCount: number;
+};
+
+export function planReviewMoves(donors: ReviewDonor[]): {
+  moves: EnrichmentMove[];
+  blockedStaleIds: string[];
+} {
+  const moves: EnrichmentMove[] = [];
+  const blockedStaleIds: string[] = [];
+  for (const d of donors) {
+    if (d.reviewCount <= 0) continue;
+    if (d.targetId && d.targetId !== d.staleId) {
+      moves.push({ staleId: d.staleId, targetId: d.targetId });
+    } else {
+      blockedStaleIds.push(d.staleId);
+    }
+  }
+  return { moves, blockedStaleIds };
+}
+
 export function planEnrichmentMoves(
   donors: EnrichmentDonor[],
   targetsAlreadyFilled: Iterable<string>
